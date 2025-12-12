@@ -892,14 +892,20 @@ class HiraganaPracticeApp:
     def get_stroke_paths(self, char):
         """Get actual stroke paths for Japanese characters.
         Returns list of stroke paths, where each path is a list of (x, y) points.
+        Stroke paths are scaled and positioned to match the actual rendered character.
         """
         from stroke_order_data import get_stroke_data
         
+        # Center position where character is drawn
         cx = self.window_width // 2
         cy = self.window_height // 3
-        s = self.scale_factor
+        
+        # Render the character to get its actual bounding box
+        char_surface = self.char_font.render(char, True, BLACK)
+        char_rect = char_surface.get_rect(center=(cx, cy))
         
         # Get stroke data from comprehensive stroke order database
+        # Coordinates are in range -60 to 60
         relative_paths = get_stroke_data(char)
         
         # If character not found, use simple default
@@ -909,10 +915,23 @@ class HiraganaPracticeApp:
                 [(-15, 10), (0, 30), (15, 45)]   # Default stroke 2
             ]
         
-        # Convert relative to absolute positions with scaling
+        # Scale stroke paths to match the actual character size
+        # The stroke data uses a coordinate system of approximately -60 to +60
+        # We need to scale this to match the actual rendered character size
+        coord_range = 120  # -60 to +60 = 120 unit range
+        
+        # Use the larger dimension of the character for scaling
+        char_size = max(char_rect.width, char_rect.height)
+        scale = char_size / coord_range
+        
+        # Convert relative to absolute positions with proper scaling and positioning
         absolute_paths = []
         for path in relative_paths:
-            absolute_path = [(int(cx + x*s), int(cy + y*s)) for x, y in path]
+            # Scale coordinates and offset to character center
+            absolute_path = [
+                (int(cx + x * scale), int(cy + y * scale)) 
+                for x, y in path
+            ]
             absolute_paths.append(absolute_path)
         
         return absolute_paths
