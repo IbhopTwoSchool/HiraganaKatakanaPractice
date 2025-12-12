@@ -23,7 +23,7 @@ display_info = pygame.display.Info()
 SCREEN_WIDTH = display_info.current_w
 SCREEN_HEIGHT = display_info.current_h
 
-# Start in fullscreen by default (optimized for tablets)
+# Default window size - let WM handle fullscreen
 WINDOW_WIDTH = SCREEN_WIDTH
 WINDOW_HEIGHT = SCREEN_HEIGHT
 
@@ -56,10 +56,10 @@ class HiraganaPracticeApp:
     
     def __init__(self):
         """Initialize the application."""
-        # Start in fullscreen mode
+        # Simple resizable window - use Super+F in Hyprland to fullscreen
         self.screen = pygame.display.set_mode(
             (WINDOW_WIDTH, WINDOW_HEIGHT),
-            pygame.FULLSCREEN | pygame.SCALED
+            pygame.RESIZABLE
         )
         pygame.display.set_caption("Hiragana & Katakana Practice")
         self.clock = pygame.time.Clock()
@@ -92,10 +92,6 @@ class HiraganaPracticeApp:
         # Pen/Stylus state (STYLUS ONLY - no mouse support)
         self.pen_touching = False  # Is pen touching screen?
         self.pen_pressure = 0.0  # Current pen pressure (0.0 to 1.0)
-        
-        # Fullscreen state (start in fullscreen)
-        self.is_fullscreen = True
-        self.windowed_size = (int(SCREEN_WIDTH * 0.8), int(SCREEN_HEIGHT * 0.85))
         
         # Background character visibility
         self.show_background = True
@@ -597,15 +593,19 @@ class HiraganaPracticeApp:
                         break
                 
                 # Check for pen/stylus input
-                # Button 1 = pen tip, Button 8/9 = stylus buttons on Wacom
-                if event.button == 8:
-                    # Stylus button 1 (typically lower button) - Previous
-                    print("✏️  Stylus button 1 pressed (Previous)")
-                    self.prev_character()
-                elif event.button == 9:
-                    # Stylus button 2 (typically upper button) - Next
-                    print("✏️  Stylus button 2 pressed (Next)")
-                    self.next_character()
+                # Debug: print all button presses
+                print(f"🔘 Button pressed: {event.button}")
+                
+                # Try various button numbers for stylus buttons
+                if event.button in [2, 3, 8, 9]:  # Common stylus button numbers
+                    if event.button in [2, 8]:
+                        # Stylus button 1 - Previous
+                        print("✏️  Stylus button 1 pressed (Previous)")
+                        self.prev_character()
+                    elif event.button in [3, 9]:
+                        # Stylus button 2 - Next
+                        print("✏️  Stylus button 2 pressed (Next)")
+                        self.next_character()
                 elif event.button == 1:  # Pen tip
                     if hasattr(event, 'pressure'):
                         # Use actual pressure value, clamped to reasonable range
