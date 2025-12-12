@@ -2,7 +2,7 @@
 """
 Hiragana and Katakana Practice Application
 A pygame-based application for practicing Japanese character writing with pen/stylus support.
-STYLUS ONLY - Mouse drawing disabled. Use pen input only.
+Optimized for Linux (Arch/Hyprland) with Wacom pen support.
 """
 
 import pygame
@@ -10,18 +10,10 @@ import sys
 import threading
 import tempfile
 import os
-import ctypes
 import time
 import platform
 from gtts import gTTS
 from characters import HIRAGANA_DATA, KATAKANA_DATA
-
-# Set Windows DPI awareness for proper scaling
-if sys.platform == 'win32':
-    try:
-        ctypes.windll.shcore.SetProcessDpiAwareness(1)  # System DPI aware
-    except:
-        pass
 
 # Initialize pygame
 pygame.init()
@@ -485,20 +477,21 @@ class HiraganaPracticeApp:
         self.previous_pos = None
     
     def toggle_fullscreen(self):
-        """Toggle fullscreen mode with proper display detection for Lenovo Y1 Yoga."""
+        """Toggle fullscreen mode (optimized for Linux/Wayland)."""
         self.is_fullscreen = not self.is_fullscreen
         
         if self.is_fullscreen:
-            # Get fresh display info for current monitor
-            display_info = pygame.display.Info()
-            
             # Store windowed size for restoration
             self.windowed_size = (self.window_width, self.window_height)
             
-            # Use pygame.FULLSCREEN flag for proper positioning on high-DPI displays
+            # Get display info
+            display_info = pygame.display.Info()
+            
+            # For Wayland/Hyprland: use FULLSCREEN | SCALED for best compatibility
+            flags = pygame.FULLSCREEN | pygame.SCALED
             self.screen = pygame.display.set_mode(
                 (display_info.current_w, display_info.current_h),
-                pygame.FULLSCREEN
+                flags
             )
             
             # Update dimensions
@@ -600,16 +593,30 @@ class HiraganaPracticeApp:
                         break
                 
                 # Check for pen/stylus input
-                if hasattr(event, 'pressure'):
-                    if event.pressure > 0:
-                        self.pen_touching = True
-                        self.pen_pressure = event.pressure
-                        self.previous_pos = event.pos
-                        self.current_stroke = [self.previous_pos]
-                else:
-                    # Fallback for devices without pressure (basic mouse/touchpad)
+                # Button 1 = pen tip, Button 8/9 = stylus buttons on Wacom
+                if event.button == 8:
+                    # Stylus button 1 (typically lower button) - Previous
+                    print("✏️  Stylus button 1 pressed (Previous)")
+                    self.prev_character()
+                elif event.button == 9:
+                    # Stylus button 2 (typically upper button) - Next
+                    print("✏️  Stylus button 2 pressed (Next)")
+                    self.next_character()
+                elif event.button == 1:  # Pen tip
+                    if hasattr(event, 'pressure'):
+                        # Use actual pressure value, clamped to reasonable range
+                        raw_pressure = event.pressure
+                        # Many styluses report 0-1 range, but some report 0-65535
+                        if raw_pressure > 1.0:
+                            raw_pressure = raw_pressure / 65535.0
+                        # Apply curve to make pressure more sensitive at low end
+                        self.pen_pressure = raw_pressure ** 0.7  # Gamma correction
+                        print(f"✏️  Pen down - Raw: {event.pressure:.4f}, Adjusted: {self.pen_pressure:.4f}")
+                    else:
+                        # Fallback for devices without pressure
+                        self.pen_pressure = 1.0
+                    
                     self.pen_touching = True
-                    self.pen_pressure = 1.0  # Default full pressure
                     self.previous_pos = event.pos
                     self.current_stroke = [self.previous_pos]
             
@@ -628,10 +635,18 @@ class HiraganaPracticeApp:
                 # Handle pen/mouse motion
                 if hasattr(event, 'pressure'):
                     # Pressure-sensitive input (stylus/pen)
-                    self.pen_pressure = event.pressure
+                    raw_pressure = event.pressure
+                    
+                    # Handle different pressure ranges (0-1 or 0-65535)
+                    if raw_pressure > 1.0:
+                        raw_pressure = raw_pressure / 65535.0
+                    
+                    # Apply gamma correction for better pressure curve
+                    self.pen_pressure = raw_pressure ** 0.7
+                    
                     pos = event.pos
                     
-                    if self.pen_pressure > 0:
+                    if self.pen_pressure > 0.01:  # Small threshold to avoid noise
                         # Pen is touching - draw
                         self.pen_touching = True
                         self.draw_smooth_pressure_stroke(pos, self.pen_pressure)
