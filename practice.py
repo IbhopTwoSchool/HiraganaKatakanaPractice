@@ -764,104 +764,26 @@ class HiraganaPracticeApp:
         """Get actual stroke paths for Japanese characters.
         Returns list of stroke paths, where each path is a list of (x, y) points.
         """
+        from stroke_order_data import get_stroke_data
+        
         cx = self.window_width // 2
         cy = self.window_height // 3
         s = self.scale_factor
         
-        # Stroke path data: character -> list of strokes -> list of points
-        # Each stroke is defined by multiple points showing the path
-        stroke_data = {
-            # Hiragana vowels
-            'あ': [
-                [(-30*s, -50*s), (-25*s, -30*s), (-20*s, -10*s)],  # Left curve
-                [(20*s, -60*s), (15*s, -40*s), (10*s, 0*s), (5*s, 30*s)],  # Right vertical
-                [(-15*s, 0*s), (-5*s, 15*s), (10*s, 25*s), (25*s, 30*s)]  # Bottom sweep
-            ],
-            'い': [
-                [(-5*s, -60*s), (-3*s, -30*s), (0*s, 0*s)],  # Left stroke
-                [(5*s, -50*s), (7*s, -20*s), (10*s, 10*s), (12*s, 40*s)]  # Right stroke
-            ],
-            'う': [
-                [(-30*s, -40*s), (-20*s, -35*s), (0*s, -30*s), (20*s, -30*s)],  # Top horizontal
-                [(-20*s, -10*s), (-10*s, 10*s), (5*s, 25*s), (20*s, 35*s)]  # Bottom curve
-            ],
-            'え': [
-                [(-35*s, -30*s), (0*s, -25*s), (35*s, -20*s)],  # Top horizontal
-                [(-25*s, -5*s), (0*s, 0*s), (25*s, 5*s)],  # Middle horizontal
-                [(-30*s, 20*s), (0*s, 25*s), (30*s, 30*s)],  # Bottom horizontal
-                [(10*s, -40*s), (10*s, -10*s), (12*s, 20*s)]  # Vertical
-            ],
-            'お': [
-                [(-35*s, -50*s), (-25*s, -45*s), (0*s, -40*s), (25*s, -40*s)],  # Top
-                [(20*s, -50*s), (20*s, -20*s), (20*s, 10*s)],  # Right vertical
-                [(-20*s, 0*s), (-10*s, 15*s), (10*s, 30*s), (30*s, 35*s)]  # Bottom curve
-            ],
-            'か': [
-                [(-35*s, -50*s), (-25*s, -45*s), (0*s, -40*s), (20*s, -38*s)],  # Top
-                [(15*s, -50*s), (15*s, -20*s), (15*s, 10*s)],  # Right vertical
-                [(-25*s, 0*s), (-15*s, 15*s), (5*s, 30*s), (25*s, 35*s)]  # Bottom curve
-            ],
-            'き': [
-                [(-15*s, -60*s), (-10*s, -30*s), (-5*s, 0*s), (0*s, 30*s)],  # Left curve
-                [(10*s, -55*s), (15*s, -25*s), (20*s, 5*s)],  # Right vertical
-                [(-25*s, -15*s), (0*s, -10*s), (25*s, -5*s)],  # Horizontal
-                [(-10*s, 10*s), (5*s, 20*s), (20*s, 30*s)]  # Bottom
-            ],
-            'く': [
-                [(0*s, -50*s), (-10*s, -20*s), (-15*s, 10*s), (-10*s, 40*s), (5*s, 50*s)]  # Single curve
-            ],
-            'こ': [
-                [(-40*s, -40*s), (-20*s, -35*s), (10*s, -30*s), (30*s, -28*s)],  # Top
-                [(-35*s, 10*s), (-15*s, 15*s), (15*s, 20*s), (35*s, 22*s)]  # Bottom
-            ],
-            'さ': [
-                [(-30*s, -50*s), (-20*s, -45*s), (0*s, -40*s), (20*s, -38*s)],  # Top
-                [(10*s, -50*s), (10*s, -20*s), (10*s, 10*s)],  # Vertical
-                [(-25*s, 0*s), (-10*s, 15*s), (10*s, 30*s), (30*s, 35*s)]  # Bottom curve
-            ],
-            'し': [
-                [(0*s, -60*s), (-5*s, -30*s), (-10*s, 0*s), (-5*s, 30*s), (10*s, 50*s)]  # Single curve
-            ],
-            'す': [
-                [(-30*s, -40*s), (-15*s, -35*s), (10*s, -30*s), (25*s, -28*s)],  # Top
-                [(0*s, -10*s), (-5*s, 10*s), (0*s, 30*s), (15*s, 45*s), (35*s, 50*s)]  # Curve
-            ],
-            'た': [
-                [(-30*s, -50*s), (-15*s, -45*s), (10*s, -40*s), (25*s, -38*s)],  # Top
-                [(15*s, -50*s), (15*s, -20*s), (15*s, 10*s)],  # Vertical
-                [(-20*s, 0*s), (-5*s, 10*s), (15*s, 20*s)],  # Middle
-                [(-15*s, 20*s), (0*s, 30*s), (20*s, 35*s), (35*s, 38*s)]  # Bottom
-            ],
-            'ん': [
-                [(0*s, -50*s), (-10*s, -20*s), (-15*s, 10*s), (-5*s, 40*s), (15*s, 50*s)]  # Curve
-            ],
-            # Katakana
-            'ア': [
-                [(-10*s, -55*s), (0*s, -15*s), (5*s, 15*s)],  # Vertical
-                [(-35*s, 20*s), (-15*s, 25*s), (15*s, 30*s), (35*s, 32*s)],  # Bottom horizontal
-                [(25*s, -10*s), (30*s, 10*s), (32*s, 30*s)]  # Right diagonal
-            ],
-            'イ': [
-                [(-20*s, -50*s), (-10*s, -30*s), (0*s, 0*s), (5*s, 30*s)],  # Left diagonal
-                [(10*s, -55*s), (15*s, -25*s), (20*s, 5*s), (22*s, 35*s)]  # Right diagonal
-            ],
-            'ウ': [
-                [(-30*s, -45*s), (-15*s, -40*s), (10*s, -35*s), (25*s, -33*s)],  # Top
-                [(-20*s, -15*s), (0*s, -10*s), (20*s, -8*s)],  # Middle
-                [(0*s, 5*s), (10*s, 20*s), (20*s, 35*s), (30*s, 45*s)]  # Bottom curve
-            ],
-        }
+        # Get stroke data from comprehensive stroke order database
+        relative_paths = get_stroke_data(char)
         
-        # Get stroke paths for this character, or default
-        relative_paths = stroke_data.get(char, [
-            [(-20*s, -40*s), (0*s, -20*s), (20*s, 0*s)],  # Default stroke 1
-            [(-15*s, 10*s), (0*s, 30*s), (15*s, 45*s)]   # Default stroke 2
-        ])
+        # If character not found, use simple default
+        if relative_paths is None:
+            relative_paths = [
+                [(-20, -40), (0, -20), (20, 0)],  # Default stroke 1
+                [(-15, 10), (0, 30), (15, 45)]   # Default stroke 2
+            ]
         
-        # Convert relative to absolute positions
+        # Convert relative to absolute positions with scaling
         absolute_paths = []
         for path in relative_paths:
-            absolute_path = [(int(cx + rx), int(cy + ry)) for rx, ry in path]
+            absolute_path = [(int(cx + x*s), int(cy + y*s)) for x, y in path]
             absolute_paths.append(absolute_path)
         
         return absolute_paths
