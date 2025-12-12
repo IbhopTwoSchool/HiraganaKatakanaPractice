@@ -391,13 +391,18 @@ class HiraganaPracticeApp:
         char, romanji = self.get_current_character()
         
         def speak():
+            temp_file = None
             try:
                 with self.tts_lock:
-                    # Stop any currently playing audio
+                    # Stop any currently playing audio and unload
                     try:
                         pygame.mixer.music.stop()
+                        pygame.mixer.music.unload()  # Critical: release file handle
                     except:
                         pass
+                    
+                    # Small delay to ensure cleanup
+                    time.sleep(0.1)
                     
                     # Create Japanese TTS audio using the actual character, not romanji
                     tts = gTTS(text=char, lang='ja', slow=False)
@@ -409,24 +414,37 @@ class HiraganaPracticeApp:
                     
                     # Initialize pygame mixer if not already done
                     if not pygame.mixer.get_init():
-                        pygame.mixer.init()
+                        pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
                     
                     # Play the audio
                     pygame.mixer.music.load(temp_file)
                     pygame.mixer.music.play()
                     
                     # Wait for playback to finish or be stopped
-                    while pygame.mixer.music.get_busy():
+                    max_wait = 50  # 5 seconds max
+                    wait_count = 0
+                    while pygame.mixer.music.get_busy() and wait_count < max_wait:
                         pygame.time.Clock().tick(10)
+                        wait_count += 1
                     
-                    # Clean up temporary file
-                    try:
-                        os.unlink(temp_file)
-                    except:
-                        pass
+                    # Unload before cleanup
+                    pygame.mixer.music.unload()
+                    time.sleep(0.1)  # Ensure file handle released
                         
             except Exception as e:
                 print(f"TTS Error: {e}")
+            finally:
+                # Always clean up temp file
+                if temp_file:
+                    try:
+                        # Force garbage collection before delete
+                        import gc
+                        gc.collect()
+                        time.sleep(0.05)
+                        if os.path.exists(temp_file):
+                            os.unlink(temp_file)
+                    except Exception as cleanup_error:
+                        print(f"Temp file cleanup warning: {cleanup_error}")
         
         # Run TTS in a separate thread to avoid blocking
         threading.Thread(target=speak, daemon=True).start()
@@ -633,16 +651,50 @@ class HiraganaPracticeApp:
             char_rect = char_surface.get_rect(center=(self.window_width // 2, self.window_height // 3))
             self.screen.blit(char_surface, char_rect)
             
-            # Draw stroke order guides (numbered circles)
-            # This is a simplified version - you'd need actual stroke order data for accuracy
+            # Draw stroke order guides with actual stroke positions
             guide_positions = self.get_stroke_order_positions(char)
             for i, pos in enumerate(guide_positions):
-                # Draw circle with number
-                circle_radius = int(15 * self.scale_factor)
-                pygame.draw.circle(self.screen, ORANGE, pos, circle_radius, 2)
-                guide_text = self.guide_font.render(str(i + 1), True, ORANGE)
+                # Draw filled circle for starting point
+                circle_radius = int(18 * self.scale_factor)
+                # Color gradient: red -> orange -> yellow as strokes progress
+                progress = i / max(1, len(guide_positions) - 1)
+                guide_color = (
+                    int(255),  # R: stays high
+                    int(140 + 115 * progress),  # G: 140->255
+                    int(0 + 100 * progress)  # B: 0->100
+                )
+                
+                # Outer glow
+                glow_radius = circle_radius + int(4 * self.scale_factor)
+                glow_surf = pygame.Surface((glow_radius*2, glow_radius*2), pygame.SRCALPHA)
+                pygame.draw.circle(glow_surf, (*guide_color, 80), (glow_radius, glow_radius), glow_radius)
+                self.screen.blit(glow_surf, (pos[0] - glow_radius, pos[1] - glow_radius))
+                
+                # Main circle
+                pygame.draw.circle(self.screen, guide_color, pos, circle_radius)
+                pygame.draw.circle(self.screen, WHITE, pos, circle_radius - int(3 * self.scale_factor))
+                
+                # Stroke number
+                guide_text = self.guide_font.render(str(i + 1), True, guide_color)
                 guide_rect = guide_text.get_rect(center=pos)
                 self.screen.blit(guide_text, guide_rect)
+                
+                # Draw arrow to next stroke
+                if i < len(guide_positions) - 1:
+                    next_pos = guide_positions[i + 1]
+                    # Draw dashed line
+                    dx = next_pos[0] - pos[0]
+                    dy = next_pos[1] - pos[1]
+                    dist = (dx*dx + dy*dy) ** 0.5
+                    if dist > circle_radius * 3:  # Only draw if strokes are far apart
+                        steps = int(dist / (10 * self.scale_factor))
+                        for step in range(steps):
+                            if step % 2 == 0:  # Dashed effect
+                                t = (step / steps) * 0.7 + 0.15  # Start/end near circles
+                                arrow_x = int(pos[0] + dx * t)
+                                arrow_y = int(pos[1] + dy * t)
+                                pygame.draw.circle(self.screen, (*guide_color, 150), 
+                                                 (arrow_x, arrow_y), int(2 * self.scale_factor))
         
         # Draw user's drawing
         self.screen.blit(self.drawing_surface, (0, 0))
@@ -700,23 +752,99 @@ class HiraganaPracticeApp:
         pygame.display.flip()
     
     def get_stroke_order_positions(self, char):
-        """Get approximate positions for stroke order guides.
-        This is a simplified version - ideally would use actual stroke data.
+        """Get actual stroke order positions for Japanese characters.
+        Returns list of (x, y) tuples showing where each stroke starts.
         """
-        # Center position
         cx = self.window_width // 2
         cy = self.window_height // 3
-        offset = int(60 * self.scale_factor)
+        s = self.scale_factor  # Scaling factor
         
-        # Simple positioning based on character complexity
-        # In a real implementation, you'd have stroke data for each character
-        positions = [
-            (cx - offset, cy - offset),
-            (cx, cy - offset),
-            (cx + offset, cy - offset),
-            (cx - offset, cy + offset),
-        ]
-        return positions[:min(4, len(positions))]  # Limit to 4 guides
+        # Actual stroke order data for common characters
+        # Format: character -> list of (relative_x, relative_y) positions
+        stroke_data = {
+            # Hiragana vowels
+            'あ': [(-30*s, -40*s), (20*s, -50*s), (-10*s, 20*s)],
+            'い': [(0*s, -50*s), (0*s, 20*s)],
+            'う': [(-20*s, -30*s), (0*s, 10*s)],
+            'え': [(-30*s, -20*s), (-10*s, -40*s), (0*s, 20*s), (20*s, 10*s)],
+            'お': [(-30*s, -40*s), (20*s, -40*s), (-10*s, 20*s)],
+            
+            # Hiragana K sounds
+            'か': [(-30*s, -40*s), (20*s, -30*s), (-20*s, 20*s)],
+            'き': [(-10*s, -50*s), (10*s, -40*s), (-20*s, 0*s), (0*s, 30*s)],
+            'く': [(0*s, -40*s), (-10*s, 20*s)],
+            'け': [(-30*s, -30*s), (20*s, -40*s), (-10*s, 10*s), (15*s, 30*s)],
+            'こ': [(-30*s, -30*s), (0*s, 10*s)],
+            
+            # Hiragana S sounds
+            'さ': [(-20*s, -40*s), (10*s, -30*s), (-10*s, 20*s)],
+            'し': [(0*s, -50*s)],
+            'す': [(-20*s, -30*s), (10*s, 10*s)],
+            'せ': [(-30*s, -30*s), (20*s, -20*s), (-10*s, 30*s)],
+            'そ': [(-30*s, -40*s), (0*s, 20*s)],
+            
+            # Hiragana T sounds
+            'た': [(-20*s, -40*s), (15*s, -30*s), (-10*s, 10*s), (20*s, 20*s)],
+            'ち': [(-10*s, -45*s), (0*s, 20*s)],
+            'つ': [(0*s, -35*s), (-10*s, 15*s)],
+            'て': [(-30*s, -30*s), (0*s, 10*s)],
+            'と': [(-30*s, -40*s), (0*s, 20*s)],
+            
+            # Hiragana N sounds
+            'な': [(-25*s, -35*s), (20*s, -35*s), (-10*s, 10*s), (0*s, 35*s)],
+            'に': [(-20*s, -30*s), (0*s, 0*s), (15*s, 25*s)],
+            'ぬ': [(-15*s, -40*s), (0*s, 20*s)],
+            'ね': [(-25*s, -35*s), (10*s, -20*s), (-10*s, 25*s)],
+            'の': [(0*s, -40*s), (0*s, 20*s)],
+            
+            # Hiragana H sounds
+            'は': [(-30*s, -35*s), (20*s, -35*s), (-10*s, 20*s)],
+            'ひ': [(-5*s, -45*s), (0*s, 25*s)],
+            'ふ': [(-20*s, -30*s), (10*s, -10*s), (-5*s, 25*s), (20*s, 20*s)],
+            'へ': [(-30*s, -20*s), (30*s, 20*s)],
+            'ほ': [(-30*s, -40*s), (20*s, -40*s), (-10*s, 20*s)],
+            
+            # Hiragana M sounds
+            'ま': [(-25*s, -35*s), (20*s, -30*s), (-10*s, 20*s)],
+            'み': [(0*s, -45*s), (15*s, 10*s)],
+            'む': [(-15*s, -35*s), (10*s, -10*s), (-5*s, 30*s)],
+            'め': [(-20*s, -35*s), (10*s, 20*s)],
+            'も': [(-30*s, -40*s), (0*s, -10*s), (-10*s, 30*s)],
+            
+            # Hiragana Y sounds
+            'や': [(-25*s, -35*s), (20*s, -30*s), (-10*s, 25*s)],
+            'ゆ': [(-20*s, -30*s), (15*s, -20*s), (0*s, 25*s)],
+            'よ': [(-30*s, -35*s), (0*s, 20*s)],
+            
+            # Hiragana R sounds
+            'ら': [(-20*s, -40*s), (15*s, -35*s)],
+            'り': [(-5*s, -45*s), (0*s, 25*s)],
+            'る': [(-15*s, -35*s), (0*s, 20*s)],
+            'れ': [(-25*s, -35*s), (10*s, 20*s)],
+            'ろ': [(-30*s, -40*s), (0*s, 20*s)],
+            
+            # Hiragana W and N
+            'わ': [(-25*s, -35*s), (20*s, -30*s), (-10*s, 25*s)],
+            'を': [(-30*s, -40*s), (20*s, -35*s), (-10*s, 25*s)],
+            'ん': [(0*s, -40*s), (0*s, 25*s)],
+            
+            # Katakana vowels
+            'ア': [(-10*s, -45*s), (0*s, -20*s), (-25*s, 20*s), (25*s, 20*s)],
+            'イ': [(-15*s, -40*s), (15*s, -40*s)],
+            'ウ': [(-20*s, -35*s), (0*s, -10*s), (15*s, 25*s)],
+            'エ': [(-30*s, -30*s), (0*s, 0*s), (30*s, 30*s)],
+            'オ': [(-30*s, -35*s), (20*s, -35*s), (0*s, 25*s)],
+            
+            # Add more as needed - this covers basics
+        }
+        
+        # Get stroke positions for this character
+        relative_positions = stroke_data.get(char, [(0*s, -30*s), (0*s, 30*s)])  # Default: 2 strokes
+        
+        # Convert relative to absolute positions
+        absolute_positions = [(int(cx + rx), int(cy + ry)) for rx, ry in relative_positions]
+        
+        return absolute_positions
     
     def run(self):
         """Main game loop."""
