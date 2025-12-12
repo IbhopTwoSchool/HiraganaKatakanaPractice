@@ -149,7 +149,23 @@ class HiraganaPracticeApp:
     
     def update_fonts(self):
         """Update fonts based on current scale factor."""
-        japanese_fonts = ['msgothic', 'meiryo', 'mspgothic', 'yugothic', 'msmincho']
+        # Try multiple font names (Windows and Linux)
+        japanese_fonts = [
+            'notosanscjkjp',  # Noto Sans CJK JP (installed by install_fonts.py)
+            'notosansjp',
+            'notosanscjk',
+            'msgothic',       # MS Gothic (Windows)
+            'meiryo',         # Meiryo (Windows)
+            'mspgothic',      # MS PGothic (Windows)
+            'yugothic',       # Yu Gothic (Windows)
+            'msmincho',       # MS Mincho (Windows)
+            'takao',          # Takao fonts (Linux)
+            'vlgothic',       # VL Gothic (Linux)
+            'ipaexgothic',    # IPA fonts (Linux)
+            'ipagothic',
+            'dejavusans',     # DejaVu Sans (fallback)
+            'liberationsans', # Liberation Sans (fallback)
+        ]
         self.char_font = pygame.font.SysFont(japanese_fonts, int(250 * self.scale_factor))
         self.ui_font = pygame.font.SysFont(japanese_fonts, int(32 * self.scale_factor))
         self.small_font = pygame.font.SysFont(japanese_fonts, int(24 * self.scale_factor))
@@ -583,10 +599,17 @@ class HiraganaPracticeApp:
                             self.running = False
                         break
                 
-                # Check for pen/stylus input (has pressure attribute)
-                if hasattr(event, 'pressure') and event.pressure > 0:
+                # Check for pen/stylus input
+                if hasattr(event, 'pressure'):
+                    if event.pressure > 0:
+                        self.pen_touching = True
+                        self.pen_pressure = event.pressure
+                        self.previous_pos = event.pos
+                        self.current_stroke = [self.previous_pos]
+                else:
+                    # Fallback for devices without pressure (basic mouse/touchpad)
                     self.pen_touching = True
-                    self.pen_pressure = event.pressure
+                    self.pen_pressure = 1.0  # Default full pressure
                     self.previous_pos = event.pos
                     self.current_stroke = [self.previous_pos]
             
@@ -602,8 +625,9 @@ class HiraganaPracticeApp:
                     self.previous_pos = None
             
             elif event.type == pygame.MOUSEMOTION:
-                # Only handle pen motion (has pressure attribute)
+                # Handle pen/mouse motion
                 if hasattr(event, 'pressure'):
+                    # Pressure-sensitive input (stylus/pen)
                     self.pen_pressure = event.pressure
                     pos = event.pos
                     
@@ -615,6 +639,10 @@ class HiraganaPracticeApp:
                         # Pen is hovering - show preview
                         self.pen_touching = False
                         self.draw_smooth_pressure_stroke(pos, 0.0)
+                elif self.pen_touching:
+                    # No pressure attribute (basic mouse/touchpad) - only draw if button down
+                    pos = event.pos
+                    self.draw_smooth_pressure_stroke(pos, self.pen_pressure)
     
     def draw(self):
         """Draw the current frame."""
