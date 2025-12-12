@@ -115,6 +115,9 @@ class HiraganaPracticeApp:
         self.tts_retry_attempts = 0  # Current retry attempt number
         self.current_audio = None
         
+        # Debug mode for stroke alignment
+        self.debug_mode = False
+        
         # Font setup with dynamic scaling
         self.update_fonts()
         
@@ -192,6 +195,7 @@ class HiraganaPracticeApp:
             {'text': 'Toggle', 'keybind': 'T', 'action': 'toggle', 'color': BUTTON_COLOR},
             {'text': 'Sound', 'keybind': 'S', 'action': 'sound', 'color': BUTTON_COLOR},
             {'text': 'Guide', 'keybind': 'G', 'action': 'toggle_bg', 'color': BUTTON_COLOR},
+            {'text': 'Debug', 'keybind': 'D', 'action': 'debug', 'color': (255, 128, 0)},
             {'text': 'Fullscreen', 'keybind': 'F11', 'action': 'fullscreen', 'color': PURPLE},
             {'text': 'Quit', 'keybind': 'ESC', 'action': 'quit', 'color': RED}
         ]
@@ -632,6 +636,10 @@ class HiraganaPracticeApp:
                     self.tts_enabled = not self.tts_enabled
                 elif event.key == pygame.K_g:
                     self.show_background = not self.show_background
+                elif event.key == pygame.K_d:
+                    # D = Toggle debug mode
+                    self.debug_mode = not self.debug_mode
+                    print(f"🐛 Debug mode: {'ON' if self.debug_mode else 'OFF'}")
             
             # PEN EVENTS - Detect pen proximity, touch, and pressure
             # Mouse events used ONLY for button clicks - no drawing
@@ -651,6 +659,9 @@ class HiraganaPracticeApp:
                             self.speak_current_character()
                         elif button['action'] == 'toggle_bg':
                             self.show_background = not self.show_background
+                        elif button['action'] == 'debug':
+                            self.debug_mode = not self.debug_mode
+                            print(f"🐛 Debug mode: {'ON' if self.debug_mode else 'OFF'}")
                         elif button['action'] == 'quit':
                             self.running = False
                         break
@@ -776,6 +787,67 @@ class HiraganaPracticeApp:
         
         # Draw user's drawing
         self.screen.blit(self.drawing_surface, (0, 0))
+        
+        # DEBUG MODE: Visualize alignment and coordinate systems
+        if self.debug_mode:
+            # Get character rendering info
+            char_surface = self.char_font.render(char, True, BLACK)
+            cx = self.window_width // 2
+            cy = self.window_height // 3
+            char_rect = char_surface.get_rect(center=(cx, cy))
+            
+            # Draw character bounding box in red
+            pygame.draw.rect(self.screen, (255, 0, 0), char_rect, 3)
+            
+            # Draw center cross
+            cross_size = 20
+            pygame.draw.line(self.screen, (255, 0, 255), 
+                           (cx - cross_size, cy), (cx + cross_size, cy), 3)
+            pygame.draw.line(self.screen, (255, 0, 255), 
+                           (cx, cy - cross_size), (cx, cy + cross_size), 3)
+            
+            # Show all stroke paths (not just current one) in different colors
+            stroke_paths = self.get_stroke_paths(char)
+            debug_colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), 
+                          (255, 0, 255), (0, 255, 255), (255, 128, 0), (128, 0, 255)]
+            
+            for i, path in enumerate(stroke_paths):
+                color = debug_colors[i % len(debug_colors)]
+                if len(path) >= 2:
+                    # Draw stroke path
+                    pygame.draw.lines(self.screen, color, False, path, 5)
+                    
+                    # Draw start point (large circle)
+                    pygame.draw.circle(self.screen, (0, 255, 0), path[0], 10)
+                    # Draw end point (large square)
+                    end_x, end_y = path[-1]
+                    pygame.draw.rect(self.screen, (255, 0, 0), 
+                                   (end_x - 8, end_y - 8, 16, 16), 0)
+                    
+                    # Label the stroke number at start
+                    label = self.small_font.render(str(i+1), True, (255, 255, 255))
+                    label_bg = self.small_font.render(str(i+1), True, (0, 0, 0))
+                    self.screen.blit(label_bg, (path[0][0] - 6, path[0][1] - 14))
+                    self.screen.blit(label, (path[0][0] - 7, path[0][1] - 15))
+            
+            # Show coordinate system info
+            info_lines = [
+                f"DEBUG MODE (Press D to toggle)",
+                f"Char: '{char}' | Size: {char_rect.width}x{char_rect.height}",
+                f"Center: ({cx}, {cy})",
+                f"Rect: ({char_rect.x}, {char_rect.y}) to ({char_rect.right}, {char_rect.bottom})",
+                f"Total Strokes: {len(stroke_paths)}",
+                f"Red Box = Character Bounds | Purple Cross = Center",
+                f"Green Circle = Stroke Start | Red Square = Stroke End"
+            ]
+            
+            debug_y = self.window_height // 2 + int(200 * self.scale_factor)
+            for line in info_lines:
+                debug_surf = self.small_font.render(line, True, (255, 255, 0))
+                debug_bg = self.small_font.render(line, True, (0, 0, 0))
+                self.screen.blit(debug_bg, (margin + 2, debug_y + 2))
+                self.screen.blit(debug_surf, (margin, debug_y))
+                debug_y += int(25 * self.scale_factor)
         
         # Draw UI elements
         margin = int(15 * self.scale_factor)
@@ -924,15 +996,31 @@ class HiraganaPracticeApp:
         char_size = max(char_rect.width, char_rect.height)
         scale = char_size / coord_range
         
+        # Debug output when in debug mode
+        if self.debug_mode:
+            print(f"\n📐 Stroke Path Calculation for '{char}':")
+            print(f"   Character rect: {char_rect}")
+            print(f"   Character size: {char_rect.width}x{char_rect.height}")
+            print(f"   Using char_size: {char_size} (max dimension)")
+            print(f"   Coord range: {coord_range}")
+            print(f"   Scale factor: {scale:.2f}")
+            print(f"   Number of strokes: {len(relative_paths)}")
+        
         # Convert relative to absolute positions with proper scaling and positioning
         absolute_paths = []
-        for path in relative_paths:
+        for idx, path in enumerate(relative_paths):
             # Scale coordinates and offset to character center
             absolute_path = [
                 (int(cx + x * scale), int(cy + y * scale)) 
                 for x, y in path
             ]
             absolute_paths.append(absolute_path)
+            
+            # Debug output for each stroke
+            if self.debug_mode and len(path) > 0:
+                print(f"   Stroke {idx+1}: {len(path)} points")
+                print(f"      Original: Start={path[0]}, End={path[-1]}")
+                print(f"      Scaled:   Start={absolute_path[0]}, End={absolute_path[-1]}")
         
         return absolute_paths
     
