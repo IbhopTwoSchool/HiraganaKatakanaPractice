@@ -56,10 +56,10 @@ class HiraganaPracticeApp:
     
     def __init__(self):
         """Initialize the application."""
-        # Simple resizable window - use Super+F in Hyprland to fullscreen
+        # Borderless fullscreen - fills entire screen without window decorations
         self.screen = pygame.display.set_mode(
             (WINDOW_WIDTH, WINDOW_HEIGHT),
-            pygame.RESIZABLE
+            pygame.NOFRAME
         )
         pygame.display.set_caption("Hiragana & Katakana Practice")
         self.clock = pygame.time.Clock()
