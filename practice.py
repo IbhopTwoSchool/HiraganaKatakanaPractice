@@ -111,6 +111,12 @@ class HiraganaPracticeApp:
         
         # TTS state
         self.tts_lock = threading.Lock()
+        self.tts_enabled = True  # Global TTS enable/disable flag
+        self.tts_error_count = 0  # Track consecutive TTS errors
+        self.tts_last_error = None  # Last TTS error message
+        self.tts_last_success = time.time()  # Time of last successful TTS
+        self.tts_failed = False  # Is TTS currently in failed state?
+        self.tts_retry_attempts = 0  # Current retry attempt number
         self.current_audio = None
         
         # Font setup with dynamic scaling
@@ -386,65 +392,165 @@ class HiraganaPracticeApp:
             pygame.draw.rect(s, color, (0, 0, particle['size'], particle['size']))
             self.screen.blit(s, (int(particle['x']), int(particle['y'])))
     
+    def reset_tts(self):
+        """Reset TTS system after failure."""
+        print("🔄 Resetting TTS system...")
+        try:
+            with self.tts_lock:
+                # Stop and unload everything
+                try:
+                    pygame.mixer.music.stop()
+                    pygame.mixer.music.unload()
+                except:
+                    pass
+                
+                # Force pygame mixer reset
+                try:
+                    pygame.mixer.quit()
+                    time.sleep(0.2)
+                    pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
+                except Exception as e:
+                    print(f"Mixer reset error: {e}")
+                
+                # Force garbage collection
+                import gc
+                gc.collect()
+                time.sleep(0.2)
+                
+                # Reset error tracking
+                self.tts_error_count = 0
+                self.tts_last_error = None
+                self.tts_failed = False
+                self.tts_retry_attempts = 0
+                self.tts_enabled = True
+                
+                print("✅ TTS system reset complete")
+        except Exception as e:
+            print(f"❌ TTS reset failed: {e}")
+    
     def speak_current_character(self):
-        """Speak the current character using Google TTS in Japanese."""
+        """Speak the current character using Google TTS in Japanese with robust error handling."""
+        if not self.tts_enabled:
+            print("⚠️ TTS is disabled")
+            return
+        
         char, romanji = self.get_current_character()
         
         def speak():
             temp_file = None
-            try:
-                with self.tts_lock:
-                    # Stop any currently playing audio and unload
-                    try:
-                        pygame.mixer.music.stop()
-                        pygame.mixer.music.unload()  # Critical: release file handle
-                    except:
-                        pass
-                    
-                    # Small delay to ensure cleanup
-                    time.sleep(0.1)
-                    
-                    # Create Japanese TTS audio using the actual character, not romanji
-                    tts = gTTS(text=char, lang='ja', slow=False)
-                    
-                    # Save to temporary file
-                    with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as fp:
-                        temp_file = fp.name
-                        tts.save(temp_file)
-                    
-                    # Initialize pygame mixer if not already done
-                    if not pygame.mixer.get_init():
-                        pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
-                    
-                    # Play the audio
-                    pygame.mixer.music.load(temp_file)
-                    pygame.mixer.music.play()
-                    
-                    # Wait for playback to finish or be stopped
-                    max_wait = 50  # 5 seconds max
-                    wait_count = 0
-                    while pygame.mixer.music.get_busy() and wait_count < max_wait:
-                        pygame.time.Clock().tick(10)
-                        wait_count += 1
-                    
-                    # Unload before cleanup
-                    pygame.mixer.music.unload()
-                    time.sleep(0.1)  # Ensure file handle released
+            max_retries = 3
+            
+            for attempt in range(max_retries):
+                try:
+                    with self.tts_lock:
+                        # Check if TTS has been disabled during wait
+                        if not self.tts_enabled:
+                            print("⚠️ TTS disabled, aborting")
+                            return
                         
-            except Exception as e:
-                print(f"TTS Error: {e}")
-            finally:
-                # Always clean up temp file
-                if temp_file:
-                    try:
-                        # Force garbage collection before delete
-                        import gc
-                        gc.collect()
-                        time.sleep(0.05)
-                        if os.path.exists(temp_file):
-                            os.unlink(temp_file)
-                    except Exception as cleanup_error:
-                        print(f"Temp file cleanup warning: {cleanup_error}")
+                        # Stop any currently playing audio and unload
+                        try:
+                            pygame.mixer.music.stop()
+                            pygame.mixer.music.unload()
+                        except Exception as cleanup_err:
+                            print(f"Pre-cleanup warning: {cleanup_err}")
+                        
+                        # Small delay to ensure cleanup
+                        time.sleep(0.1)
+                        
+                        # Verify mixer is initialized
+                        if not pygame.mixer.get_init():
+                            print("🔧 Reinitializing pygame mixer")
+                            pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
+                        
+                        # Create Japanese TTS audio
+                        print(f"🔊 Generating TTS for '{char}' (attempt {attempt + 1}/{max_retries})")
+                        tts = gTTS(text=char, lang='ja', slow=False)
+                        
+                        # Save to temporary file
+                        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as fp:
+                            temp_file = fp.name
+                            tts.save(temp_file)
+                        
+                        # Verify file was created and has content
+                        if not os.path.exists(temp_file) or os.path.getsize(temp_file) == 0:
+                            raise Exception(f"TTS file creation failed: {temp_file}")
+                        
+                        print(f"✅ TTS file created: {os.path.getsize(temp_file)} bytes")
+                        
+                        # Play the audio
+                        pygame.mixer.music.load(temp_file)
+                        pygame.mixer.music.play()
+                        
+                        # Wait for playback to finish
+                        max_wait = 50  # 5 seconds max
+                        wait_count = 0
+                        playback_started = False
+                        
+                        while wait_count < max_wait:
+                            is_busy = pygame.mixer.music.get_busy()
+                            if is_busy:
+                                playback_started = True
+                            elif playback_started:
+                                # Playback finished normally
+                                break
+                            
+                            pygame.time.Clock().tick(10)
+                            wait_count += 1
+                        
+                        if not playback_started:
+                            raise Exception("Playback never started")
+                        
+                        # Unload before cleanup
+                        pygame.mixer.music.unload()
+                        time.sleep(0.1)
+                        
+                        # SUCCESS - update tracking
+                        self.tts_last_success = time.time()
+                        self.tts_error_count = 0
+                        self.tts_retry_attempts = 0
+                        self.tts_failed = False
+                        print(f"✅ TTS playback successful for '{char}'")
+                        
+                        # Break retry loop on success
+                        break
+                            
+                except Exception as e:
+                    error_msg = f"TTS Error (attempt {attempt + 1}/{max_retries}): {type(e).__name__}: {e}"
+                    print(f"❌ {error_msg}")
+                    
+                    self.tts_last_error = str(e)
+                    self.tts_error_count += 1
+                    self.tts_retry_attempts = attempt + 1
+                    
+                    # If this was the last retry, mark as failed
+                    if attempt == max_retries - 1:
+                        self.tts_failed = True
+                        print(f"❌ TTS FAILED after {max_retries} attempts")
+                        print(f"⚠️ Last error: {self.tts_last_error}")
+                        print(f"💡 Press 'R' to reset TTS or 'T' to toggle TTS on/off")
+                        
+                        # Auto-disable TTS after 5 consecutive failures
+                        if self.tts_error_count >= 5:
+                            self.tts_enabled = False
+                            print(f"⛔ TTS auto-disabled after {self.tts_error_count} failures")
+                            print(f"💡 Press 'T' to re-enable TTS")
+                    else:
+                        # Wait before retry
+                        time.sleep(0.5 * (attempt + 1))
+                        print(f"🔄 Retrying TTS...")
+                
+                finally:
+                    # Always clean up temp file
+                    if temp_file:
+                        try:
+                            import gc
+                            gc.collect()
+                            time.sleep(0.05)
+                            if os.path.exists(temp_file):
+                                os.unlink(temp_file)
+                        except Exception as cleanup_error:
+                            print(f"⚠️ Temp file cleanup warning: {cleanup_error}")
         
         # Run TTS in a separate thread to avoid blocking
         threading.Thread(target=speak, daemon=True).start()
@@ -529,6 +635,14 @@ class HiraganaPracticeApp:
                     self.toggle_mode()
                 elif event.key == pygame.K_s:
                     self.speak_current_character()
+                elif event.key == pygame.K_r:
+                    # R: Reset TTS system
+                    self.reset_tts()
+                elif event.key == pygame.K_m:
+                    # M: Toggle TTS on/off (Mute)
+                    self.tts_enabled = not self.tts_enabled
+                    status = "enabled" if self.tts_enabled else "disabled"
+                    print(f"🔊 TTS {status}")
                 elif event.key == pygame.K_g:
                     self.show_background = not self.show_background
             
@@ -732,6 +846,62 @@ class HiraganaPracticeApp:
         romanji_surface = self.ui_font.render(romanji_text, True, DARK_GRAY)
         romanji_rect = romanji_surface.get_rect(center=(self.window_width // 2, self.window_height // 2 + int(150 * self.scale_factor)))
         self.screen.blit(romanji_surface, romanji_rect)
+        
+        # Draw TTS status indicator
+        tts_status_y = self.window_height - int(60 * self.scale_factor)
+        if not self.tts_enabled:
+            # TTS disabled
+            status_text = "🔇 TTS Disabled (Press M to enable)"
+            status_color = DARK_GRAY
+        elif self.tts_failed:
+            # TTS failed
+            status_text = f"❌ TTS Failed (Press R to reset, M to disable)"
+            status_color = RED
+        elif self.tts_error_count > 0:
+            # TTS has errors but still working
+            status_text = f"⚠️ TTS Issues ({self.tts_error_count} errors)"
+            status_color = ORANGE
+        else:
+            # TTS working normally - show time since last success
+            time_since = int(time.time() - self.tts_last_success)
+            if time_since < 60:
+                status_text = f"🔊 TTS Active"
+                status_color = GREEN
+            else:
+                status_text = f"🔊 TTS Active ({time_since//60}m since last use)"
+                status_color = DARK_GRAY
+        
+        status_surface = self.keybind_font.render(status_text, True, status_color)
+        status_rect = status_surface.get_rect(center=(self.window_width // 2, tts_status_y))
+        self.screen.blit(status_surface, status_rect)
+        
+        # Draw TTS status indicator
+        tts_status_y = self.window_height - int(60 * self.scale_factor)
+        if not self.tts_enabled:
+            # TTS disabled
+            status_text = "🔇 TTS Disabled (Press T to enable)"
+            status_color = DARK_GRAY
+        elif self.tts_failed:
+            # TTS failed
+            status_text = f"❌ TTS Failed (Press R to reset, T to disable)"
+            status_color = RED
+        elif self.tts_error_count > 0:
+            # TTS has errors but still working
+            status_text = f"⚠️ TTS Issues ({self.tts_error_count} errors)"
+            status_color = ORANGE
+        else:
+            # TTS working normally - show time since last success
+            time_since = int(time.time() - self.tts_last_success)
+            if time_since < 60:
+                status_text = f"🔊 TTS Active"
+                status_color = GREEN
+            else:
+                status_text = f"🔊 TTS Active ({time_since//60}m since last use)"
+                status_color = DARK_GRAY
+        
+        status_surface = self.keybind_font.render(status_text, True, status_color)
+        status_rect = status_surface.get_rect(center=(self.window_width // 2, tts_status_y))
+        self.screen.blit(status_surface, status_rect)
         
         # Draw buttons
         mouse_pos = pygame.mouse.get_pos()
