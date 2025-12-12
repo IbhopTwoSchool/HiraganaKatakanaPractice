@@ -91,8 +91,6 @@ class HiraganaPracticeApp:
         self.previous_pos = None  # Track previous position for smooth lines
         
         # Pen/Stylus state (STYLUS ONLY - no mouse support)
-        self.pen_detected = False  # Is pen removed from socket?
-        self.pen_in_proximity = False  # Is pen hovering near screen?
         self.pen_touching = False  # Is pen touching screen?
         self.pen_pressure = 0.0  # Current pen pressure (0.0 to 1.0)
         
@@ -587,12 +585,10 @@ class HiraganaPracticeApp:
                 
                 # Check for pen/stylus input (has pressure attribute)
                 if hasattr(event, 'pressure') and event.pressure > 0:
-                    self.pen_detected = True
                     self.pen_touching = True
                     self.pen_pressure = event.pressure
                     self.previous_pos = event.pos
                     self.current_stroke = [self.previous_pos]
-                    print(f"✏️  Pen detected! Pressure: {event.pressure:.2f}")
             
             elif event.type == pygame.MOUSEBUTTONUP:
                 # Only handle pen lift
@@ -613,12 +609,10 @@ class HiraganaPracticeApp:
                     
                     if self.pen_pressure > 0:
                         # Pen is touching - draw
-                        self.pen_detected = True
                         self.pen_touching = True
                         self.draw_smooth_pressure_stroke(pos, self.pen_pressure)
-                    elif self.pen_detected:
-                        # Pen is hovering - show preview (only if pen was previously detected)
-                        self.pen_in_proximity = True
+                    else:
+                        # Pen is hovering - show preview
                         self.pen_touching = False
                         self.draw_smooth_pressure_stroke(pos, 0.0)
     
@@ -658,19 +652,12 @@ class HiraganaPracticeApp:
         self.screen.blit(mode_surface, (margin, margin))
         
         # Draw pen status
-        if self.pen_detected:
-            if self.pen_touching:
-                pen_status = f"✏️ Pen Active (Pressure: {self.pen_pressure:.0%})"
-                pen_color = GREEN
-            elif self.pen_in_proximity:
-                pen_status = "✏️ Pen Hovering"
-                pen_color = ORANGE
-            else:
-                pen_status = "✏️ Pen Ready"
-                pen_color = BLUE
+        if self.pen_touching:
+            pen_status = f"✏️ Drawing (Pressure: {self.pen_pressure:.0%})"
+            pen_color = GREEN
         else:
-            pen_status = "⚠️ Waiting for pen..."
-            pen_color = RED
+            pen_status = "✏️ Pen Ready"
+            pen_color = BLUE
         
         pen_surface = self.small_font.render(pen_status, True, pen_color)
         self.screen.blit(pen_surface, (self.window_width - margin - pen_surface.get_width(), margin))
