@@ -795,16 +795,11 @@ class HiraganaPracticeApp:
             pygame.draw.rect(self.screen, color, button['rect'], border_radius=8)
             pygame.draw.rect(self.screen, DARK_GRAY, button['rect'], 2, border_radius=8)
             
-            # Draw button text
-            text_surface = self.button_font.render(button['text'], True, WHITE)
+            # Draw button text with keybind
+            button_text = f"{button['text']} [{button['keybind']}]"
+            text_surface = self.button_font.render(button_text, True, WHITE)
             text_rect = text_surface.get_rect(center=button['rect'].center)
             self.screen.blit(text_surface, text_rect)
-            
-            # Draw keybind hint
-            keybind_surface = self.keybind_font.render(f"[{button['keybind']}]", True, WHITE)
-            keybind_rect = keybind_surface.get_rect(centerx=button['rect'].centerx, 
-                                                    top=button['rect'].bottom + 2)
-            self.screen.blit(keybind_surface, keybind_rect)
         
         pygame.display.flip()
     
