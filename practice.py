@@ -56,11 +56,20 @@ class HiraganaPracticeApp:
     
     def __init__(self):
         """Initialize the application."""
+        # DEBUG: Show what we're trying to create
+        print(f"🖥️  INITIALIZING: {WINDOW_WIDTH}x{WINDOW_HEIGHT}")
+        print(f"🖥️  Screen detected: {SCREEN_WIDTH}x{SCREEN_HEIGHT}")
+        
         # Borderless fullscreen - fills entire screen without window decorations
         self.screen = pygame.display.set_mode(
             (WINDOW_WIDTH, WINDOW_HEIGHT),
             pygame.NOFRAME
         )
+        
+        # DEBUG: Verify what we actually got
+        actual_size = self.screen.get_size()
+        print(f"✅ WINDOW CREATED: {actual_size[0]}x{actual_size[1]}")
+        
         pygame.display.set_caption("Hiragana & Katakana Practice")
         self.clock = pygame.time.Clock()
         self.running = True
@@ -69,10 +78,6 @@ class HiraganaPracticeApp:
         self.window_width = WINDOW_WIDTH
         self.window_height = WINDOW_HEIGHT
         self.calculate_layout()
-        
-        # Fullscreen state (start as fullscreen)
-        self.is_fullscreen = True
-        self.windowed_size = (int(SCREEN_WIDTH * 0.8), int(SCREEN_HEIGHT * 0.85))
         
         # Character selection
         self.character_set = HIRAGANA_DATA
@@ -479,52 +484,7 @@ class HiraganaPracticeApp:
         self.current_stroke = []
         self.previous_pos = None
     
-    def toggle_fullscreen(self):
-        """Toggle fullscreen mode (optimized for Linux/Wayland)."""
-        self.is_fullscreen = not self.is_fullscreen
-        
-        if self.is_fullscreen:
-            # Get display info
-            display_info = pygame.display.Info()
-            
-            # For Wayland/Hyprland: use FULLSCREEN | SCALED for best compatibility
-            flags = pygame.FULLSCREEN | pygame.SCALED
-            self.screen = pygame.display.set_mode(
-                (display_info.current_w, display_info.current_h),
-                flags
-            )
-            
-            # Update dimensions
-            self.window_width = display_info.current_w
-            self.window_height = display_info.current_h
-            
-            print(f"Fullscreen: {self.window_width}x{self.window_height}")
-        else:
-            # Restore windowed mode
-            self.screen = pygame.display.set_mode(
-                self.windowed_size,
-                pygame.RESIZABLE
-            )
-            
-            # Restore dimensions
-            self.window_width, self.window_height = self.windowed_size
-            
-            print(f"Windowed: {self.window_width}x{self.window_height}")
-        
-        # Recalculate layout for new size
-        self.calculate_layout()
-        self.update_fonts()
-        self.buttons = self.create_buttons()
-        
-        # Recreate drawing surface and preserve content by scaling
-        old_surface = self.drawing_surface.copy()
-        self.drawing_surface = pygame.Surface((self.window_width, self.window_height), pygame.SRCALPHA)
-        self.drawing_surface.fill(WHITE)
-        self.drawing_surface.set_colorkey(WHITE)
-        
-        # Scale old drawing to new size if there's content
-        if len(self.drawing_strokes) > 0:
-            pygame.transform.scale(old_surface, (self.window_width, self.window_height), self.drawing_surface)
+
     
     def handle_events(self):
         """Handle pygame events - PEN INPUT ONLY."""
@@ -533,28 +493,14 @@ class HiraganaPracticeApp:
                 self.running = False
             
             elif event.type == pygame.VIDEORESIZE:
-                # Handle window resize
-                self.window_width = event.w
-                self.window_height = event.h
-                self.screen = pygame.display.set_mode((self.window_width, self.window_height), pygame.RESIZABLE)
-                
-                # Recalculate layout and recreate surfaces
-                self.calculate_layout()
-                self.update_fonts()
-                self.buttons = self.create_buttons()
-                
-                # Resize drawing surface (preserve content)
-                old_surface = self.drawing_surface.copy()
-                self.drawing_surface = pygame.Surface((self.window_width, self.window_height), pygame.SRCALPHA)
-                self.drawing_surface.fill(WHITE)
-                self.drawing_surface.set_colorkey(WHITE)
-                self.drawing_surface.blit(old_surface, (0, 0))
+                # DEBUG: Track any resize attempts
+                print(f"⚠️  VIDEORESIZE EVENT: {event.w}x{event.h}")
+                print(f"⚠️  This should NOT happen with NOFRAME!")
+                # DO NOT change display mode - stay in NOFRAME
             
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE or event.key == pygame.K_q:
                     self.running = False
-                elif event.key == pygame.K_F11 or event.key == pygame.K_f:
-                    self.toggle_fullscreen()
                 elif event.key == pygame.K_RIGHT or event.key == pygame.K_SPACE:
                     self.next_character()
                 elif event.key == pygame.K_LEFT:
@@ -586,8 +532,6 @@ class HiraganaPracticeApp:
                             self.speak_current_character()
                         elif button['action'] == 'toggle_bg':
                             self.show_background = not self.show_background
-                        elif button['action'] == 'fullscreen':
-                            self.toggle_fullscreen()
                         elif button['action'] == 'quit':
                             self.running = False
                         break
