@@ -651,50 +651,59 @@ class HiraganaPracticeApp:
             char_rect = char_surface.get_rect(center=(self.window_width // 2, self.window_height // 3))
             self.screen.blit(char_surface, char_rect)
             
-            # Draw stroke order guides with actual stroke positions
-            guide_positions = self.get_stroke_order_positions(char)
-            for i, pos in enumerate(guide_positions):
-                # Draw filled circle for starting point
-                circle_radius = int(18 * self.scale_factor)
-                # Color gradient: red -> orange -> yellow as strokes progress
-                progress = i / max(1, len(guide_positions) - 1)
-                guide_color = (
-                    int(255),  # R: stays high
-                    int(140 + 115 * progress),  # G: 140->255
-                    int(0 + 100 * progress)  # B: 0->100
+            # Draw stroke order guides as lines with arrows
+            stroke_paths = self.get_stroke_paths(char)
+            for i, path in enumerate(stroke_paths):
+                # Color gradient for each stroke
+                progress = i / max(1, len(stroke_paths) - 1)
+                stroke_color = (
+                    int(255 - 100 * progress),  # R: 255->155
+                    int(50 + 150 * progress),   # G: 50->200
+                    int(50)                      # B: constant
                 )
                 
-                # Outer glow
-                glow_radius = circle_radius + int(4 * self.scale_factor)
-                glow_surf = pygame.Surface((glow_radius*2, glow_radius*2), pygame.SRCALPHA)
-                pygame.draw.circle(glow_surf, (*guide_color, 80), (glow_radius, glow_radius), glow_radius)
-                self.screen.blit(glow_surf, (pos[0] - glow_radius, pos[1] - glow_radius))
-                
-                # Main circle
-                pygame.draw.circle(self.screen, guide_color, pos, circle_radius)
-                pygame.draw.circle(self.screen, WHITE, pos, circle_radius - int(3 * self.scale_factor))
-                
-                # Stroke number
-                guide_text = self.guide_font.render(str(i + 1), True, guide_color)
-                guide_rect = guide_text.get_rect(center=pos)
-                self.screen.blit(guide_text, guide_rect)
-                
-                # Draw arrow to next stroke
-                if i < len(guide_positions) - 1:
-                    next_pos = guide_positions[i + 1]
-                    # Draw dashed line
-                    dx = next_pos[0] - pos[0]
-                    dy = next_pos[1] - pos[1]
-                    dist = (dx*dx + dy*dy) ** 0.5
-                    if dist > circle_radius * 3:  # Only draw if strokes are far apart
-                        steps = int(dist / (10 * self.scale_factor))
-                        for step in range(steps):
-                            if step % 2 == 0:  # Dashed effect
-                                t = (step / steps) * 0.7 + 0.15  # Start/end near circles
-                                arrow_x = int(pos[0] + dx * t)
-                                arrow_y = int(pos[1] + dy * t)
-                                pygame.draw.circle(self.screen, (*guide_color, 150), 
-                                                 (arrow_x, arrow_y), int(2 * self.scale_factor))
+                # Draw the stroke path as a thick line
+                if len(path) >= 2:
+                    thickness = int(6 * self.scale_factor)
+                    pygame.draw.lines(self.screen, stroke_color, False, path, thickness)
+                    
+                    # Draw arrowhead at the end of the stroke
+                    end_point = path[-1]
+                    if len(path) >= 2:
+                        # Calculate arrow direction from last two points
+                        prev_point = path[-2]
+                        dx = end_point[0] - prev_point[0]
+                        dy = end_point[1] - prev_point[1]
+                        length = max(1, (dx*dx + dy*dy)**0.5)
+                        
+                        # Normalize direction
+                        dx /= length
+                        dy /= length
+                        
+                        # Arrow size
+                        arrow_size = int(20 * self.scale_factor)
+                        arrow_width = int(12 * self.scale_factor)
+                        
+                        # Calculate arrow points (triangular arrowhead)
+                        arrow_tip = end_point
+                        arrow_base = (
+                            int(end_point[0] - dx * arrow_size),
+                            int(end_point[1] - dy * arrow_size)
+                        )
+                        # Perpendicular vector for arrow wings
+                        perp_x, perp_y = -dy, dx
+                        arrow_left = (
+                            int(arrow_base[0] + perp_x * arrow_width),
+                            int(arrow_base[1] + perp_y * arrow_width)
+                        )
+                        arrow_right = (
+                            int(arrow_base[0] - perp_x * arrow_width),
+                            int(arrow_base[1] - perp_y * arrow_width)
+                        )
+                        
+                        # Draw filled arrow
+                        pygame.draw.polygon(self.screen, stroke_color, 
+                                          [arrow_tip, arrow_left, arrow_right])
         
         # Draw user's drawing
         self.screen.blit(self.drawing_surface, (0, 0))
@@ -742,100 +751,111 @@ class HiraganaPracticeApp:
             
             # Draw keybind hint
             keybind_surface = self.keybind_font.render(f"[{button['keybind']}]", True, WHITE)
-            keybind_rect = keybind_surface.get_rect(centerx=button['rect'].centerx, 
-                                                    top=button['rect'].bottom + 2)
-            self.screen.blit(keybind_surface, keybind_rect)
-        
-        # Draw confetti if celebrating
-        self.draw_confetti()
-        
-        pygame.display.flip()
-    
-    def get_stroke_order_positions(self, char):
-        """Get actual stroke order positions for Japanese characters.
-        Returns list of (x, y) tuples showing where each stroke starts.
+            keybindpaths(self, char):
+        """Get actual stroke paths for Japanese characters.
+        Returns list of stroke paths, where each path is a list of (x, y) points.
         """
         cx = self.window_width // 2
         cy = self.window_height // 3
-        s = self.scale_factor  # Scaling factor
+        s = self.scale_factor
         
-        # Actual stroke order data for common characters
-        # Format: character -> list of (relative_x, relative_y) positions
+        # Stroke path data: character -> list of strokes -> list of points
+        # Each stroke is defined by multiple points showing the path
         stroke_data = {
             # Hiragana vowels
-            'あ': [(-30*s, -40*s), (20*s, -50*s), (-10*s, 20*s)],
-            'い': [(0*s, -50*s), (0*s, 20*s)],
-            'う': [(-20*s, -30*s), (0*s, 10*s)],
-            'え': [(-30*s, -20*s), (-10*s, -40*s), (0*s, 20*s), (20*s, 10*s)],
-            'お': [(-30*s, -40*s), (20*s, -40*s), (-10*s, 20*s)],
-            
-            # Hiragana K sounds
-            'か': [(-30*s, -40*s), (20*s, -30*s), (-20*s, 20*s)],
-            'き': [(-10*s, -50*s), (10*s, -40*s), (-20*s, 0*s), (0*s, 30*s)],
-            'く': [(0*s, -40*s), (-10*s, 20*s)],
-            'け': [(-30*s, -30*s), (20*s, -40*s), (-10*s, 10*s), (15*s, 30*s)],
-            'こ': [(-30*s, -30*s), (0*s, 10*s)],
-            
-            # Hiragana S sounds
-            'さ': [(-20*s, -40*s), (10*s, -30*s), (-10*s, 20*s)],
-            'し': [(0*s, -50*s)],
-            'す': [(-20*s, -30*s), (10*s, 10*s)],
-            'せ': [(-30*s, -30*s), (20*s, -20*s), (-10*s, 30*s)],
-            'そ': [(-30*s, -40*s), (0*s, 20*s)],
-            
-            # Hiragana T sounds
-            'た': [(-20*s, -40*s), (15*s, -30*s), (-10*s, 10*s), (20*s, 20*s)],
-            'ち': [(-10*s, -45*s), (0*s, 20*s)],
-            'つ': [(0*s, -35*s), (-10*s, 15*s)],
-            'て': [(-30*s, -30*s), (0*s, 10*s)],
-            'と': [(-30*s, -40*s), (0*s, 20*s)],
-            
-            # Hiragana N sounds
-            'な': [(-25*s, -35*s), (20*s, -35*s), (-10*s, 10*s), (0*s, 35*s)],
-            'に': [(-20*s, -30*s), (0*s, 0*s), (15*s, 25*s)],
-            'ぬ': [(-15*s, -40*s), (0*s, 20*s)],
-            'ね': [(-25*s, -35*s), (10*s, -20*s), (-10*s, 25*s)],
-            'の': [(0*s, -40*s), (0*s, 20*s)],
-            
-            # Hiragana H sounds
-            'は': [(-30*s, -35*s), (20*s, -35*s), (-10*s, 20*s)],
-            'ひ': [(-5*s, -45*s), (0*s, 25*s)],
-            'ふ': [(-20*s, -30*s), (10*s, -10*s), (-5*s, 25*s), (20*s, 20*s)],
-            'へ': [(-30*s, -20*s), (30*s, 20*s)],
-            'ほ': [(-30*s, -40*s), (20*s, -40*s), (-10*s, 20*s)],
-            
-            # Hiragana M sounds
-            'ま': [(-25*s, -35*s), (20*s, -30*s), (-10*s, 20*s)],
-            'み': [(0*s, -45*s), (15*s, 10*s)],
-            'む': [(-15*s, -35*s), (10*s, -10*s), (-5*s, 30*s)],
-            'め': [(-20*s, -35*s), (10*s, 20*s)],
-            'も': [(-30*s, -40*s), (0*s, -10*s), (-10*s, 30*s)],
-            
-            # Hiragana Y sounds
-            'や': [(-25*s, -35*s), (20*s, -30*s), (-10*s, 25*s)],
-            'ゆ': [(-20*s, -30*s), (15*s, -20*s), (0*s, 25*s)],
-            'よ': [(-30*s, -35*s), (0*s, 20*s)],
-            
-            # Hiragana R sounds
-            'ら': [(-20*s, -40*s), (15*s, -35*s)],
-            'り': [(-5*s, -45*s), (0*s, 25*s)],
-            'る': [(-15*s, -35*s), (0*s, 20*s)],
-            'れ': [(-25*s, -35*s), (10*s, 20*s)],
-            'ろ': [(-30*s, -40*s), (0*s, 20*s)],
-            
-            # Hiragana W and N
-            'わ': [(-25*s, -35*s), (20*s, -30*s), (-10*s, 25*s)],
-            'を': [(-30*s, -40*s), (20*s, -35*s), (-10*s, 25*s)],
-            'ん': [(0*s, -40*s), (0*s, 25*s)],
-            
-            # Katakana vowels
-            'ア': [(-10*s, -45*s), (0*s, -20*s), (-25*s, 20*s), (25*s, 20*s)],
-            'イ': [(-15*s, -40*s), (15*s, -40*s)],
-            'ウ': [(-20*s, -35*s), (0*s, -10*s), (15*s, 25*s)],
-            'エ': [(-30*s, -30*s), (0*s, 0*s), (30*s, 30*s)],
-            'オ': [(-30*s, -35*s), (20*s, -35*s), (0*s, 25*s)],
-            
-            # Add more as needed - this covers basics
+            'あ': [
+                [(-30*s, -50*s), (-25*s, -30*s), (-20*s, -10*s)],  # Left curve
+                [(20*s, -60*s), (15*s, -40*s), (10*s, 0*s), (5*s, 30*s)],  # Right vertical
+                [(-15*s, 0*s), (-5*s, 15*s), (10*s, 25*s), (25*s, 30*s)]  # Bottom sweep
+            ],
+            'い': [
+                [(-5*s, -60*s), (-3*s, -30*s), (0*s, 0*s)],  # Left stroke
+                [(5*s, -50*s), (7*s, -20*s), (10*s, 10*s), (12*s, 40*s)]  # Right stroke
+            ],
+            'う': [
+                [(-30*s, -40*s), (-20*s, -35*s), (0*s, -30*s), (20*s, -30*s)],  # Top horizontal
+                [(-20*s, -10*s), (-10*s, 10*s), (5*s, 25*s), (20*s, 35*s)]  # Bottom curve
+            ],
+            'え': [
+                [(-35*s, -30*s), (0*s, -25*s), (35*s, -20*s)],  # Top horizontal
+                [(-25*s, -5*s), (0*s, 0*s), (25*s, 5*s)],  # Middle horizontal
+                [(-30*s, 20*s), (0*s, 25*s), (30*s, 30*s)],  # Bottom horizontal
+                [(10*s, -40*s), (10*s, -10*s), (12*s, 20*s)]  # Vertical
+            ],
+            'お': [
+                [(-35*s, -50*s), (-25*s, -45*s), (0*s, -40*s), (25*s, -40*s)],  # Top
+                [(20*s, -50*s), (20*s, -20*s), (20*s, 10*s)],  # Right vertical
+                [(-20*s, 0*s), (-10*s, 15*s), (10*s, 30*s), (30*s, 35*s)]  # Bottom curve
+            ],
+            'か': [
+                [(-35*s, -50*s), (-25*s, -45*s), (0*s, -40*s), (20*s, -38*s)],  # Top
+                [(15*s, -50*s), (15*s, -20*s), (15*s, 10*s)],  # Right vertical
+                [(-25*s, 0*s), (-15*s, 15*s), (5*s, 30*s), (25*s, 35*s)]  # Bottom curve
+            ],
+            'き': [
+                [(-15*s, -60*s), (-10*s, -30*s), (-5*s, 0*s), (0*s, 30*s)],  # Left curve
+                [(10*s, -55*s), (15*s, -25*s), (20*s, 5*s)],  # Right vertical
+                [(-25*s, -15*s), (0*s, -10*s), (25*s, -5*s)],  # Horizontal
+                [(-10*s, 10*s), (5*s, 20*s), (20*s, 30*s)]  # Bottom
+            ],
+            'く': [
+                [(0*s, -50*s), (-10*s, -20*s), (-15*s, 10*s), (-10*s, 40*s), (5*s, 50*s)]  # Single curve
+            ],
+            'こ': [
+                [(-40*s, -40*s), (-20*s, -35*s), (10*s, -30*s), (30*s, -28*s)],  # Top
+                [(-35*s, 10*s), (-15*s, 15*s), (15*s, 20*s), (35*s, 22*s)]  # Bottom
+            ],
+            'さ': [
+                [(-30*s, -50*s), (-20*s, -45*s), (0*s, -40*s), (20*s, -38*s)],  # Top
+                [(10*s, -50*s), (10*s, -20*s), (10*s, 10*s)],  # Vertical
+                [(-25*s, 0*s), (-10*s, 15*s), (10*s, 30*s), (30*s, 35*s)]  # Bottom curve
+            ],
+            'し': [
+                [(0*s, -60*s), (-5*s, -30*s), (-10*s, 0*s), (-5*s, 30*s), (10*s, 50*s)]  # Single curve
+            ],
+            'す': [
+                [(-30*s, -40*s), (-15*s, -35*s), (10*s, -30*s), (25*s, -28*s)],  # Top
+                [(0*s, -10*s), (-5*s, 10*s), (0*s, 30*s), (15*s, 45*s), (35*s, 50*s)]  # Curve
+            ],
+            'た': [
+                [(-30*s, -50*s), (-15*s, -45*s), (10*s, -40*s), (25*s, -38*s)],  # Top
+                [(15*s, -50*s), (15*s, -20*s), (15*s, 10*s)],  # Vertical
+                [(-20*s, 0*s), (-5*s, 10*s), (15*s, 20*s)],  # Middle
+                [(-15*s, 20*s), (0*s, 30*s), (20*s, 35*s), (35*s, 38*s)]  # Bottom
+            ],
+            'ん': [
+                [(0*s, -50*s), (-10*s, -20*s), (-15*s, 10*s), (-5*s, 40*s), (15*s, 50*s)]  # Curve
+            ],
+            # Katakana
+            'ア': [
+                [(-10*s, -55*s), (0*s, -15*s), (5*s, 15*s)],  # Vertical
+                [(-35*s, 20*s), (-15*s, 25*s), (15*s, 30*s), (35*s, 32*s)],  # Bottom horizontal
+                [(25*s, -10*s), (30*s, 10*s), (32*s, 30*s)]  # Right diagonal
+            ],
+            'イ': [
+                [(-20*s, -50*s), (-10*s, -30*s), (0*s, 0*s), (5*s, 30*s)],  # Left diagonal
+                [(10*s, -55*s), (15*s, -25*s), (20*s, 5*s), (22*s, 35*s)]  # Right diagonal
+            ],
+            'ウ': [
+                [(-30*s, -45*s), (-15*s, -40*s), (10*s, -35*s), (25*s, -33*s)],  # Top
+                [(-20*s, -15*s), (0*s, -10*s), (20*s, -8*s)],  # Middle
+                [(0*s, 5*s), (10*s, 20*s), (20*s, 35*s), (30*s, 45*s)]  # Bottom curve
+            ],
+        }
+        
+        # Get stroke paths for this character, or default
+        relative_paths = stroke_data.get(char, [
+            [(-20*s, -40*s), (0*s, -20*s), (20*s, 0*s)],  # Default stroke 1
+            [(-15*s, 10*s), (0*s, 30*s), (15*s, 45*s)]   # Default stroke 2
+        ])
+        
+        # Convert relative to absolute positions
+        absolute_paths = []
+        for path in relative_paths:
+            absolute_path = [(int(cx + rx), int(cy + ry)) for rx, ry in path]
+            absolute_paths.append(absolute_path)
+        
+        return absolute_path - this covers basics
         }
         
         # Get stroke positions for this character
