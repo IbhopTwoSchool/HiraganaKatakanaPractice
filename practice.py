@@ -694,12 +694,24 @@ class HiraganaPracticeApp:
                 if hasattr(event, 'pressure') or self.pen_touching:
                     self.pen_touching = False
                     self.pen_pressure = 0.0
-                    # Finish current stroke and advance guide
+                    # Finish current stroke and validate before advancing guide
                     if len(self.current_stroke) > 2:
                         self.drawing_strokes.append(self.current_stroke.copy())
-                        # Advance to next stroke guide when user completes a stroke
-                        if self.current_stroke_guide < self.total_stroke_guides - 1:
-                            self.current_stroke_guide += 1
+                        
+                        # Validate stroke against current guide before advancing
+                        char, _ = self.get_current_character()
+                        stroke_paths = self.get_stroke_paths(char)
+                        
+                        if self.current_stroke_guide < len(stroke_paths):
+                            current_guide = stroke_paths[self.current_stroke_guide]
+                            
+                            # Check if user's stroke follows the guide
+                            if self.validate_stroke_against_guide(self.current_stroke, current_guide):
+                                # Valid stroke - advance to next guide
+                                if self.current_stroke_guide < len(stroke_paths) - 1:
+                                    self.current_stroke_guide += 1
+                            # If invalid, don't advance - they need to try again
+                    
                     self.current_stroke = []
                     self.previous_pos = None
             
@@ -744,23 +756,23 @@ class HiraganaPracticeApp:
             char_surface = self.char_font.render(char, True, LIGHT_GRAY)
             char_rect = char_surface.get_rect(center=(self.window_width // 2, self.window_height // 3))
             self.screen.blit(char_surface, char_rect)
+        
+        # Draw progressive stroke guide - only show current stroke
+        # This MUST be drawn AFTER the character so it overlays properly
+        stroke_paths = self.get_stroke_paths(char)
+        self.total_stroke_guides = len(stroke_paths)
+        
+        # Only show the current stroke the user should draw
+        if self.current_stroke_guide < len(stroke_paths):
+            path = stroke_paths[self.current_stroke_guide]
             
-            # Draw progressive stroke guide - only show current stroke
-            stroke_paths = self.get_stroke_paths(char)
-            self.total_stroke_guides = len(stroke_paths)
+            # Use a bright, visible guide color that overlays the character
+            guide_color = (0, 150, 255)  # Bright blue guide
             
-            # Only show the current stroke the user should draw
-            if self.current_stroke_guide < len(stroke_paths):
-                path = stroke_paths[self.current_stroke_guide]
-                
-                # Use a semi-transparent guide color
-                guide_color = (100, 150, 255)  # Light blue guide
-                
-                # Draw the stroke path as a thick semi-transparent line
-                if len(path) >= 2:
-                    thickness = int(8 * self.scale_factor)
-                    # Draw with slight transparency effect by drawing thinner overlays
-                    pygame.draw.lines(self.screen, guide_color, False, path, thickness)
+            # Draw the stroke path as a THICK visible line overlaying the character
+            if len(path) >= 2:
+                thickness = int(12 * self.scale_factor)  # Thicker for visibility
+                pygame.draw.lines(self.screen, guide_color, False, path, thickness)
         
         # Draw user's drawing
         self.screen.blit(self.drawing_surface, (0, 0))
@@ -904,6 +916,75 @@ class HiraganaPracticeApp:
             absolute_paths.append(absolute_path)
         
         return absolute_paths
+    
+    def validate_stroke_against_guide(self, user_stroke, guide_path):
+        """Check if user's stroke follows the guide path closely enough.
+        
+        Args:
+            user_stroke: List of (x, y) points the user drew
+            guide_path: List of (x, y) points in the guide
+        
+        Returns:
+            bool: True if stroke is close enough to guide, False otherwise
+        """
+        if not user_stroke or not guide_path:
+            return False
+        
+        if len(user_stroke) < 3:
+            return False  # Too short to be a real stroke
+        
+        # Calculate a tolerance based on screen size
+        # Allow about 15% of character size as tolerance
+        tolerance = int(50 * self.scale_factor)
+        
+        # Count how many user points are close to the guide path
+        points_near_guide = 0
+        
+        for user_point in user_stroke:
+            # Check if this user point is close to ANY point in the guide path
+            min_distance = float('inf')
+            
+            for guide_point in guide_path:
+                dx = user_point[0] - guide_point[0]
+                dy = user_point[1] - guide_point[1]
+                distance = (dx*dx + dy*dy) ** 0.5
+                min_distance = min(min_distance, distance)
+            
+            if min_distance <= tolerance:
+                points_near_guide += 1
+        
+        # Require at least 40% of user's points to be near the guide
+        coverage_ratio = points_near_guide / len(user_stroke)
+        
+        # Also check that user covered a reasonable length of the guide
+        # Get start and end regions of guide
+        guide_start = guide_path[0]
+        guide_end = guide_path[-1]
+        
+        # Check if user started near the guide start
+        user_start = user_stroke[0]
+        start_dx = user_start[0] - guide_start[0]
+        start_dy = user_start[1] - guide_start[1]
+        start_distance = (start_dx*start_dx + start_dy*start_dy) ** 0.5
+        
+        # Check if user ended near the guide end
+        user_end = user_stroke[-1]
+        end_dx = user_end[0] - guide_end[0]
+        end_dy = user_end[1] - guide_end[1]
+        end_distance = (end_dx*end_dx + end_dy*end_dy) ** 0.5
+        
+        # More lenient tolerance for start/end points
+        endpoint_tolerance = tolerance * 1.5
+        
+        # Stroke is valid if:
+        # 1. Reasonable coverage of points near guide (40%+)
+        # 2. Started reasonably close to guide start OR ended close to guide end
+        is_valid = (
+            coverage_ratio >= 0.4 and 
+            (start_distance <= endpoint_tolerance or end_distance <= endpoint_tolerance)
+        )
+        
+        return is_valid
     
     def run(self):
         """Main game loop."""
