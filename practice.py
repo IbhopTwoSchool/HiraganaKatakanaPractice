@@ -45,7 +45,6 @@ YELLOW = (255, 215, 0)
 PURPLE = (160, 32, 240)
 ORANGE = (255, 165, 0)
 PINK = (255, 192, 203)
-CONFETTI_COLORS = [RED, BLUE, GREEN, YELLOW, PURPLE, ORANGE, PINK]
 
 # Drawing color
 PEN_COLOR = BLACK
@@ -102,9 +101,6 @@ class HiraganaPracticeApp:
         self.current_stroke_guide = 0  # Which stroke guide to show (0-indexed)
         self.total_stroke_guides = 0  # Total number of strokes for current character
         
-        # Confetti particles
-        self.confetti_particles = []
-        
         # TTS state
         self.tts_lock = threading.Lock()
         self.tts_enabled = True  # Global TTS enable/disable flag
@@ -120,15 +116,6 @@ class HiraganaPracticeApp:
         
         # Create buttons
         self.buttons = self.create_buttons()
-        
-        # Initialize sound system
-        pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
-        self.success_sound = self.create_success_sound()
-        
-        # Display pen mode message
-        print("\n✏️  PEN-ONLY MODE ACTIVE")
-        print("This application requires a stylus/pen input.")
-        print("Remove your pen from its socket to begin.\n")
         
         # Speak the first character
         self.speak_current_character()
@@ -192,7 +179,6 @@ class HiraganaPracticeApp:
             {'text': 'Toggle', 'keybind': 'T', 'action': 'toggle', 'color': BUTTON_COLOR},
             {'text': 'Sound', 'keybind': 'S', 'action': 'sound', 'color': BUTTON_COLOR},
             {'text': 'Guide', 'keybind': 'G', 'action': 'toggle_bg', 'color': BUTTON_COLOR},
-            {'text': 'Fullscreen', 'keybind': 'F11', 'action': 'fullscreen', 'color': PURPLE},
             {'text': 'Quit', 'keybind': 'ESC', 'action': 'quit', 'color': RED}
         ]
         
@@ -260,42 +246,6 @@ class HiraganaPracticeApp:
         if pressure > 0:
             self.current_stroke.append(pos)
     
-    def create_success_sound(self):
-        """Create a success sound effect programmatically."""
-        try:
-            import numpy as np
-            sample_rate = 22050
-            duration = 0.3  # seconds
-            frequency1 = 523.25  # C5
-            frequency2 = 659.25  # E5
-            frequency3 = 783.99  # G5
-            
-            # Generate samples for a pleasant chord
-            num_samples = int(sample_rate * duration)
-            t = np.linspace(0, duration, num_samples, False)
-            
-            # Create envelope (fade out)
-            envelope = 1 - (t / duration)
-            
-            # Create a chord with three notes
-            wave1 = np.sin(frequency1 * 2 * np.pi * t)
-            wave2 = np.sin(frequency2 * 2 * np.pi * t)
-            wave3 = np.sin(frequency3 * 2 * np.pi * t)
-            
-            # Mix waves together with envelope
-            wave = (wave1 + wave2 + wave3) / 3 * envelope * 32767
-            wave = wave.astype(np.int16)
-            
-            # Convert to stereo
-            stereo_wave = np.column_stack((wave, wave))
-            
-            # Create pygame Sound from numpy array
-            sound = pygame.sndarray.make_sound(stereo_wave)
-            return sound
-        except Exception as e:
-            print(f"Could not create success sound: {e}")
-            return None
-    
     def check_character_completion(self):
         """Check if the character has been drawn correctly with improved detection."""
         # Only check when not actively drawing and when pen is not touching
@@ -354,39 +304,6 @@ class HiraganaPracticeApp:
             return True
         
         return False
-    
-    def create_confetti(self):
-        """Create confetti particles for celebration."""
-        for _ in range(100):
-            self.confetti_particles.append({
-                'x': self.window_width // 2,
-                'y': self.window_height // 3,
-                'vx': (pygame.time.get_ticks() % 100 - 50) * 0.2,
-                'vy': -(pygame.time.get_ticks() % 50 + 50) * 0.2,
-                'color': CONFETTI_COLORS[pygame.time.get_ticks() % len(CONFETTI_COLORS)],
-                'size': int(5 * self.scale_factor),
-                'life': 100
-            })
-    
-    def update_confetti(self):
-        """Update confetti particle positions."""
-        for particle in self.confetti_particles[:]:
-            particle['x'] += particle['vx']
-            particle['y'] += particle['vy']
-            particle['vy'] += 0.5  # Gravity
-            particle['life'] -= 1
-            
-            if particle['life'] <= 0 or particle['y'] > self.window_height:
-                self.confetti_particles.remove(particle)
-    
-    def draw_confetti(self):
-        """Draw confetti particles."""
-        for particle in self.confetti_particles:
-            alpha = int(255 * (particle['life'] / 100))
-            s = pygame.Surface((particle['size'], particle['size']), pygame.SRCALPHA)
-            color = (*particle['color'], alpha)
-            pygame.draw.rect(s, color, (0, 0, particle['size'], particle['size']))
-            self.screen.blit(s, (int(particle['x']), int(particle['y'])))
     
     def reset_tts(self):
         """Reset TTS system after failure."""
@@ -781,7 +698,7 @@ class HiraganaPracticeApp:
         margin = int(15 * self.scale_factor)
         
         # Draw mode indicator
-        mode_text = f"Mode: {self.mode.capitalize()} | Use Super+F to fullscreen in Hyprland"
+        mode_text = f"Mode: {self.mode.capitalize()}"
         mode_surface = self.ui_font.render(mode_text, True, BLUE)
         self.screen.blit(mode_surface, (margin, margin))
         
@@ -883,9 +800,6 @@ class HiraganaPracticeApp:
             keybind_rect = keybind_surface.get_rect(centerx=button['rect'].centerx, 
                                                     top=button['rect'].bottom + 2)
             self.screen.blit(keybind_surface, keybind_rect)
-        
-        # Draw confetti if celebrating
-        self.draw_confetti()
         
         pygame.display.flip()
     
@@ -1016,12 +930,6 @@ class HiraganaPracticeApp:
                 if self.check_character_completion():
                     self.character_completed = True
                     print("✓ Character completed!")
-                    if self.success_sound:
-                        self.success_sound.play()
-                    self.create_confetti()
-            
-            # Update confetti
-            self.update_confetti()
             
             # Draw everything
             self.draw()
