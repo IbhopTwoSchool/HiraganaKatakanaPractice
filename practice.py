@@ -23,9 +23,9 @@ display_info = pygame.display.Info()
 SCREEN_WIDTH = display_info.current_w
 SCREEN_HEIGHT = display_info.current_h
 
-# Set window size to 80% of screen size (or smaller for tablets)
-WINDOW_WIDTH = min(int(SCREEN_WIDTH * 0.8), 1400)
-WINDOW_HEIGHT = min(int(SCREEN_HEIGHT * 0.85), 900)
+# Start in fullscreen by default (optimized for tablets)
+WINDOW_WIDTH = SCREEN_WIDTH
+WINDOW_HEIGHT = SCREEN_HEIGHT
 
 # Constants
 FPS = 60
@@ -56,16 +56,23 @@ class HiraganaPracticeApp:
     
     def __init__(self):
         """Initialize the application."""
-        # Make window resizable and fullscreen-capable
-        self.screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.RESIZABLE)
-        pygame.display.set_caption("Hiragana & Katakana Practice - Stylus Only")
+        # Start in fullscreen mode
+        self.screen = pygame.display.set_mode(
+            (WINDOW_WIDTH, WINDOW_HEIGHT),
+            pygame.FULLSCREEN | pygame.SCALED
+        )
+        pygame.display.set_caption("Hiragana & Katakana Practice")
         self.clock = pygame.time.Clock()
         self.running = True
         
-        # Window dimensions (will be updated on resize)
+        # Window dimensions
         self.window_width = WINDOW_WIDTH
         self.window_height = WINDOW_HEIGHT
         self.calculate_layout()
+        
+        # Fullscreen state (start as fullscreen)
+        self.is_fullscreen = True
+        self.windowed_size = (int(SCREEN_WIDTH * 0.8), int(SCREEN_HEIGHT * 0.85))
         
         # Character selection
         self.character_set = HIRAGANA_DATA
@@ -86,9 +93,9 @@ class HiraganaPracticeApp:
         self.pen_touching = False  # Is pen touching screen?
         self.pen_pressure = 0.0  # Current pen pressure (0.0 to 1.0)
         
-        # Fullscreen state
-        self.is_fullscreen = False
-        self.windowed_size = (WINDOW_WIDTH, WINDOW_HEIGHT)
+        # Fullscreen state (start in fullscreen)
+        self.is_fullscreen = True
+        self.windowed_size = (int(SCREEN_WIDTH * 0.8), int(SCREEN_HEIGHT * 0.85))
         
         # Background character visibility
         self.show_background = True
@@ -481,9 +488,6 @@ class HiraganaPracticeApp:
         self.is_fullscreen = not self.is_fullscreen
         
         if self.is_fullscreen:
-            # Store windowed size for restoration
-            self.windowed_size = (self.window_width, self.window_height)
-            
             # Get display info
             display_info = pygame.display.Info()
             
