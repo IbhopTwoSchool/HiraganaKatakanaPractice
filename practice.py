@@ -751,7 +751,16 @@ class HiraganaPracticeApp:
             
             # Draw keybind hint
             keybind_surface = self.keybind_font.render(f"[{button['keybind']}]", True, WHITE)
-            keybindpaths(self, char):
+            keybind_rect = keybind_surface.get_rect(centerx=button['rect'].centerx, 
+                                                    top=button['rect'].bottom + 2)
+            self.screen.blit(keybind_surface, keybind_rect)
+        
+        # Draw confetti if celebrating
+        self.draw_confetti()
+        
+        pygame.display.flip()
+    
+    def get_stroke_paths(self, char):
         """Get actual stroke paths for Japanese characters.
         Returns list of stroke paths, where each path is a list of (x, y) points.
         """
