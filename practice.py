@@ -855,16 +855,7 @@ class HiraganaPracticeApp:
             absolute_path = [(int(cx + rx), int(cy + ry)) for rx, ry in path]
             absolute_paths.append(absolute_path)
         
-        return absolute_path - this covers basics
-        }
-        
-        # Get stroke positions for this character
-        relative_positions = stroke_data.get(char, [(0*s, -30*s), (0*s, 30*s)])  # Default: 2 strokes
-        
-        # Convert relative to absolute positions
-        absolute_positions = [(int(cx + rx), int(cy + ry)) for rx, ry in relative_positions]
-        
-        return absolute_positions
+        return absolute_paths
     
     def run(self):
         """Main game loop."""
