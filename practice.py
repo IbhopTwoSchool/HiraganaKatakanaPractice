@@ -497,13 +497,18 @@ class HiraganaPracticeApp:
         except:
             pass
         
+        # Keep the current character index when switching modes
+        current_index = self.character_index
+        
         if self.mode == "hiragana":
             self.mode = "katakana"
             self.character_set = KATAKANA_DATA
         else:
             self.mode = "hiragana"
             self.character_set = HIRAGANA_DATA
-        self.character_index = 0
+        
+        # Maintain position, but cap at the length of the new character set
+        self.character_index = min(current_index, len(self.character_set) - 1)
         self.clear_drawing()
         self.character_completed = False
         self.speak_current_character()
