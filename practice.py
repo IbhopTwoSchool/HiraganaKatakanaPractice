@@ -2,6 +2,7 @@
 """
 Hiragana and Katakana Practice Application
 A pygame-based application for practicing Japanese character writing with pen/stylus support.
+STYLUS ONLY - Mouse drawing disabled. Use pen input only.
 """
 
 import pygame
@@ -10,7 +11,6 @@ import threading
 import tempfile
 import os
 import ctypes
-import random
 import time
 import platform
 from gtts import gTTS
@@ -66,7 +66,7 @@ class HiraganaPracticeApp:
         """Initialize the application."""
         # Make window resizable and fullscreen-capable
         self.screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.RESIZABLE)
-        pygame.display.set_caption("Hiragana & Katakana Practice")
+        pygame.display.set_caption("Hiragana & Katakana Practice - Stylus Only")
         self.clock = pygame.time.Clock()
         self.running = True
         
@@ -81,22 +81,24 @@ class HiraganaPracticeApp:
         self.mode = "hiragana"  # "hiragana" or "katakana"
         
         # Drawing state
-        self.drawing = False
-        self.drawing_surface = pygame.Surface((self.window_width, self.window_height))
+        self.drawing_surface = pygame.Surface((self.window_width, self.window_height), pygame.SRCALPHA)
         self.drawing_surface.fill(WHITE)
         self.drawing_surface.set_colorkey(WHITE)  # Make white transparent
         
         # Stroke tracking for better completion detection
         self.drawing_strokes = []  # List of strokes (each stroke is a list of points)
         self.current_stroke = []  # Current stroke being drawn
+        self.previous_pos = None  # Track previous position for smooth lines
         
-        # Stylus mode
-        self.stylus_mode = False
-        self.stylus_detected = False
-        self.last_pressure = 1.0
+        # Pen/Stylus state (STYLUS ONLY - no mouse support)
+        self.pen_detected = False  # Is pen removed from socket?
+        self.pen_in_proximity = False  # Is pen hovering near screen?
+        self.pen_touching = False  # Is pen touching screen?
+        self.pen_pressure = 0.0  # Current pen pressure (0.0 to 1.0)
         
-        # Detect if running on Lenovo Y1 Yoga or similar touch-enabled device
-        self.detect_touch_device()
+        # Fullscreen state
+        self.is_fullscreen = False
+        self.windowed_size = (WINDOW_WIDTH, WINDOW_HEIGHT)
         
         # Background character visibility
         self.show_background = True
@@ -122,6 +124,11 @@ class HiraganaPracticeApp:
         # Initialize sound system
         pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
         self.success_sound = self.create_success_sound()
+        
+        # Display pen mode message
+        print("\n✏️  PEN-ONLY MODE ACTIVE")
+        print("This application requires a stylus/pen input.")
+        print("Remove your pen from its socket to begin.\n")
         
         # Speak the first character
         self.speak_current_character()
@@ -169,7 +176,7 @@ class HiraganaPracticeApp:
             {'text': 'Toggle', 'keybind': 'T', 'action': 'toggle', 'color': BUTTON_COLOR},
             {'text': 'Sound', 'keybind': 'S', 'action': 'sound', 'color': BUTTON_COLOR},
             {'text': 'Guide', 'keybind': 'G', 'action': 'toggle_bg', 'color': BUTTON_COLOR},
-            {'text': '✏️ Stylus', 'keybind': 'P', 'action': 'toggle_stylus', 'color': PURPLE},
+            {'text': 'Fullscreen', 'keybind': 'F11', 'action': 'fullscreen', 'color': PURPLE},
             {'text': 'Quit', 'keybind': 'ESC', 'action': 'quit', 'color': RED}
         ]
         
@@ -185,50 +192,57 @@ class HiraganaPracticeApp:
         
         return buttons
     
-    def detect_touch_device(self):
-        """Detect if running on a touch-enabled device like Lenovo Y1 Yoga."""
-        try:
-            # Check Windows system info for touch capability
-            if sys.platform == 'win32':
-                system_info = platform.machine().lower()
-                # Auto-enable stylus mode if touch-capable hardware detected
-                if 'yoga' in platform.node().lower() or 'lenovo' in platform.node().lower():
-                    self.stylus_mode = True
-                    print("Touch-enabled device detected - Stylus mode enabled")
-        except:
-            pass
-    
-    def draw_brush_stroke(self, pos, pressure=1.0):
-        """Draw a brush-like stroke with pressure sensitivity."""
-        # Adjust brush size based on pressure (0.0 to 1.0)
-        brush_size = int(self.pen_width * pressure * 2.5)
-        brush_size = max(4, min(brush_size, int(self.pen_width * 3)))
+    def draw_smooth_pressure_stroke(self, pos, pressure=0.0):
+        """Draw a beautiful smooth pressure-sensitive stroke like a fine brush.
         
-        # Create multiple circles with slight offsets for brush effect
-        for i in range(3):
-            offset_x = random.randint(-2, 2)
-            offset_y = random.randint(-2, 2)
-            alpha = int(120 + (135 * pressure))  # More opaque with more pressure
-            
-            # Draw semi-transparent circles for brush effect in BLACK
-            brush_surface = pygame.Surface((brush_size * 2, brush_size * 2), pygame.SRCALPHA)
-            pygame.draw.circle(brush_surface, (*PEN_COLOR, alpha), 
-                             (brush_size, brush_size), brush_size - i)
-            
-            # Use normal blending to preserve black color
-            self.drawing_surface.blit(brush_surface, 
-                                     (pos[0] + offset_x - brush_size, 
-                                      pos[1] + offset_y - brush_size))
+        The pen creates darker, wider strokes as pressure increases.
+        When hovering (proximity), shows a light preview.
+        """
+        # Calculate stroke width based on pressure (2px to 20px)
+        if pressure <= 0:  # Hovering/proximity only
+            stroke_width = 1
+            alpha = 30  # Very faint preview
+            color = (*PEN_COLOR, alpha)
+        else:
+            # Map pressure to width: light touch = thin, heavy = thick
+            stroke_width = int(2 + (pressure * 18))  # 2-20px range
+            # Map pressure to opacity: light = semi-transparent, heavy = solid
+            alpha = int(100 + (pressure * 155))  # 100-255 range
+            color = (*PEN_COLOR, alpha)
         
-        # Track the stroke point
-        self.current_stroke.append(pos)
-    
-    def draw_pen_stroke(self, pos, prev_pos):
-        """Draw a regular pen stroke."""
-        pygame.draw.line(self.drawing_surface, PEN_COLOR, prev_pos, pos, self.pen_width)
-        pygame.draw.circle(self.drawing_surface, PEN_COLOR, pos, self.pen_width // 2)
-        # Track the stroke point
-        self.current_stroke.append(pos)
+        # Draw smooth line from previous position
+        if self.previous_pos and self.previous_pos != pos:
+            # Calculate line length and angle for smooth rendering
+            dx = pos[0] - self.previous_pos[0]
+            dy = pos[1] - self.previous_pos[1]
+            distance = max(1, int((dx*dx + dy*dy)**0.5))
+            
+            # Draw multiple circles along the line for smooth, brush-like appearance
+            steps = max(1, distance // 2)
+            for i in range(steps + 1):
+                t = i / max(1, steps)
+                interp_x = int(self.previous_pos[0] + dx * t)
+                interp_y = int(self.previous_pos[1] + dy * t)
+                
+                # Create circle surface with alpha
+                circle_surface = pygame.Surface((stroke_width * 2, stroke_width * 2), pygame.SRCALPHA)
+                pygame.draw.circle(circle_surface, color, (stroke_width, stroke_width), stroke_width)
+                
+                # Blit to drawing surface
+                self.drawing_surface.blit(circle_surface, 
+                                        (interp_x - stroke_width, interp_y - stroke_width))
+        else:
+            # First point or discontinuous - just draw a circle
+            circle_surface = pygame.Surface((stroke_width * 2, stroke_width * 2), pygame.SRCALPHA)
+            pygame.draw.circle(circle_surface, color, (stroke_width, stroke_width), stroke_width)
+            self.drawing_surface.blit(circle_surface, (pos[0] - stroke_width, pos[1] - stroke_width))
+        
+        # Update previous position for next stroke segment
+        self.previous_pos = pos
+        
+        # Track the stroke point (only if actually drawing)
+        if pressure > 0:
+            self.current_stroke.append(pos)
     
     def create_success_sound(self):
         """Create a success sound effect programmatically."""
@@ -252,152 +266,114 @@ class HiraganaPracticeApp:
             wave2 = np.sin(frequency2 * 2 * np.pi * t)
             wave3 = np.sin(frequency3 * 2 * np.pi * t)
             
-            # Mix waves with envelope
-            mixed = (wave1 + wave2 + wave3) / 3 * envelope
+            # Mix waves together with envelope
+            wave = (wave1 + wave2 + wave3) / 3 * envelope * 32767
+            wave = wave.astype(np.int16)
             
-            # Convert to 16-bit integer stereo
-            audio = (mixed * 32767).astype(np.int16)
-            audio = np.repeat(audio.reshape(-1, 1), 2, axis=1)  # Make stereo
+            # Convert to stereo
+            stereo_wave = np.column_stack((wave, wave))
             
-            sound = pygame.sndarray.make_sound(audio)
+            # Create pygame Sound from numpy array
+            sound = pygame.sndarray.make_sound(stereo_wave)
             return sound
         except Exception as e:
-            print(f"Error creating success sound: {e}")
+            print(f"Could not create success sound: {e}")
             return None
     
-    def get_stroke_order_hints(self, char):
-        """Get stroke order hints for a character (simplified for common characters)."""
-        # Return list of numbered guide points for stroke order
-        # These are approximate positions relative to character center
-        # Format: [(number, x_offset, y_offset), ...]
-        stroke_hints = {
-            # Hiragana vowels
-            'あ': [(1, -0.3, -0.4), (2, 0.2, -0.3), (3, 0, 0.3)],
-            'い': [(1, 0, -0.4), (2, -0.2, 0.2)],
-            'う': [(1, -0.2, -0.3), (2, 0, 0.2)],
-            'え': [(1, -0.3, -0.3), (2, 0.2, 0)],
-            'お': [(1, -0.3, -0.4), (2, 0, -0.2), (3, -0.1, 0.3)],
-            # Add more as needed - for now, default to center
-        }
-        return stroke_hints.get(char, [(1, 0, -0.3), (2, 0, 0), (3, 0, 0.3)])
+    def check_character_completion(self):
+        """Check if the character has been drawn correctly with improved detection."""
+        # Only check when not actively drawing and when pen is not touching
+        if self.pen_touching:
+            return False
+        
+        # Don't check too frequently
+        current_time = time.time()
+        if current_time - self.last_check_time < self.check_interval:
+            return False
+        self.last_check_time = current_time
+        
+        # Need at least 2 strokes for basic characters (some simple ones might need 1)
+        if len(self.drawing_strokes) < 1:
+            return False
+        
+        # Create a mask of the drawn strokes
+        stroke_mask = pygame.Surface((self.window_width, self.window_height))
+        stroke_mask.fill(WHITE)
+        
+        # Draw all strokes onto the mask
+        for stroke in self.drawing_strokes:
+            if len(stroke) > 1:
+                for i in range(len(stroke) - 1):
+                    pygame.draw.line(stroke_mask, BLACK, stroke[i], stroke[i + 1], self.pen_width)
+        
+        # Convert to mask for collision detection
+        drawn_mask = pygame.mask.from_surface(stroke_mask)
+        drawn_pixels = drawn_mask.count()
+        
+        # Get character surface to compare
+        char, _ = self.get_current_character()
+        char_surface = self.char_font.render(char, True, BLACK)
+        char_rect = char_surface.get_rect(center=(self.window_width // 2, self.window_height // 3))
+        
+        # Create mask from character
+        char_mask = pygame.mask.from_surface(char_surface)
+        char_pixels = char_mask.count()
+        
+        if char_pixels == 0:
+            return False
+        
+        # Calculate overlap - offset by character position
+        overlap = char_mask.overlap_area(drawn_mask, (char_rect.x, char_rect.y))
+        coverage = (overlap / char_pixels) * 100
+        
+        # Adaptive completion based on stroke count and coverage
+        # More strokes = character might be more complex, require less coverage
+        num_strokes = len(self.drawing_strokes)
+        
+        if num_strokes >= 2 and coverage >= 65:
+            return True
+        elif num_strokes == 1 and coverage >= 80:  # Simple characters might need 1 stroke
+            return True
+        elif num_strokes >= 3 and coverage >= 60:  # Complex characters
+            return True
+        
+        return False
     
     def create_confetti(self):
         """Create confetti particles for celebration."""
-        for _ in range(50):
-            particle = {
+        for _ in range(100):
+            self.confetti_particles.append({
                 'x': self.window_width // 2,
-                'y': self.window_height // 2 - int(50 * self.scale_factor),
-                'vx': random.uniform(-8, 8) * self.scale_factor,
-                'vy': random.uniform(-12, -5) * self.scale_factor,
-                'gravity': 0.4 * self.scale_factor,
-                'size': random.randint(int(5 * self.scale_factor), int(12 * self.scale_factor)),
-                'color': random.choice(CONFETTI_COLORS),
-                'rotation': random.uniform(0, 360),
-                'rotation_speed': random.uniform(-10, 10),
-                'lifetime': 120  # frames
-            }
-            self.confetti_particles.append(particle)
+                'y': self.window_height // 3,
+                'vx': (pygame.time.get_ticks() % 100 - 50) * 0.2,
+                'vy': -(pygame.time.get_ticks() % 50 + 50) * 0.2,
+                'color': CONFETTI_COLORS[pygame.time.get_ticks() % len(CONFETTI_COLORS)],
+                'size': int(5 * self.scale_factor),
+                'life': 100
+            })
     
     def update_confetti(self):
-        """Update confetti particle positions and remove dead particles."""
+        """Update confetti particle positions."""
         for particle in self.confetti_particles[:]:
             particle['x'] += particle['vx']
             particle['y'] += particle['vy']
-            particle['vy'] += particle['gravity']
-            particle['rotation'] += particle['rotation_speed']
-            particle['lifetime'] -= 1
+            particle['vy'] += 0.5  # Gravity
+            particle['life'] -= 1
             
-            if particle['lifetime'] <= 0 or particle['y'] > WINDOW_HEIGHT:
+            if particle['life'] <= 0 or particle['y'] > self.window_height:
                 self.confetti_particles.remove(particle)
     
     def draw_confetti(self):
         """Draw confetti particles."""
         for particle in self.confetti_particles:
-            # Create a small square surface for the confetti
-            size = particle['size']
-            surf = pygame.Surface((size, size), pygame.SRCALPHA)
-            pygame.draw.rect(surf, particle['color'], (0, 0, size, size))
-            
-            # Rotate the surface
-            rotated = pygame.transform.rotate(surf, particle['rotation'])
-            rect = rotated.get_rect(center=(int(particle['x']), int(particle['y'])))
-            
-            # Apply fade out near end of lifetime
-            alpha = min(255, particle['lifetime'] * 4)
-            rotated.set_alpha(alpha)
-            
-            self.screen.blit(rotated, rect)
-    
-    def check_character_completion(self):
-        """Check if the user has traced the character sufficiently using improved detection."""
-        if self.character_completed or not self.show_background:
-            return
-        
-        # Don't check while actively drawing - only after cursor is lifted
-        if self.drawing:
-            return
-        
-        # Only check if user has made strokes
-        if len(self.drawing_strokes) < 1:
-            return
-        
-        current_time = time.time()
-        if current_time - self.last_check_time < self.check_interval:
-            return
-        
-        self.last_check_time = current_time
-        
-        try:
-            # Render the target character to a surface
-            char, romanji = self.get_current_character()
-            char_surface = self.char_font.render(char, True, BLACK)
-            char_rect = char_surface.get_rect(center=(self.window_width // 2, self.window_height // 2 - int(30 * self.scale_factor)))
-            
-            # Create a mask from the character
-            char_mask = pygame.mask.from_surface(char_surface)
-            
-            # Create a mask from the user's drawing at the character position
-            clipped_rect = char_rect.clip(pygame.Rect(0, 0, self.window_width, self.window_height))
-            if clipped_rect.width <= 0 or clipped_rect.height <= 0:
-                return
-            
-            drawing_subsurface = self.drawing_surface.subsurface(clipped_rect)
-            drawing_mask = pygame.mask.from_surface(drawing_subsurface)
-            
-            # Count overlapping pixels
-            char_pixels = char_mask.count()
-            if char_pixels == 0:
-                return
-            
-            # Calculate overlap
-            overlap = char_mask.overlap_area(drawing_mask, (0, 0))
-            coverage = overlap / char_pixels
-            
-            # Check stroke count - Japanese characters typically have 2-5 strokes
-            stroke_count = len(self.drawing_strokes)
-            
-            # STRICT completion criteria to prevent early confetti:
-            # - Need at least 2 strokes AND 65% coverage
-            # - OR single stroke with 80% coverage (for simple characters like "い")
-            # - OR 3+ strokes with 60% coverage (completed character)
-            completion_criteria_met = (
-                (stroke_count >= 2 and coverage >= 0.65) or
-                (stroke_count == 1 and coverage >= 0.80) or
-                (stroke_count >= 3 and coverage >= 0.60)
-            )
-            
-            if completion_criteria_met:
-                self.character_completed = True
-                self.create_confetti()
-                if self.success_sound:
-                    self.success_sound.play()
-                print(f"✓ Character completed! Strokes: {stroke_count}, Coverage: {coverage:.1%}")
-        
-        except Exception as e:
-            pass  # Silently ignore errors in completion detection
+            alpha = int(255 * (particle['life'] / 100))
+            s = pygame.Surface((particle['size'], particle['size']), pygame.SRCALPHA)
+            color = (*particle['color'], alpha)
+            pygame.draw.rect(s, color, (0, 0, particle['size'], particle['size']))
+            self.screen.blit(s, (int(particle['x']), int(particle['y'])))
     
     def speak_current_character(self):
-        """Speak the romanji pronunciation of the current character using Japanese TTS."""
+        """Speak the current character using Google TTS in Japanese."""
         char, romanji = self.get_current_character()
         
         def speak():
@@ -410,7 +386,6 @@ class HiraganaPracticeApp:
                         pass
                     
                     # Create Japanese TTS audio using the actual character, not romanji
-                    # This ensures proper Japanese pronunciation
                     tts = gTTS(text=char, lang='ja', slow=False)
                     
                     # Save to temporary file
@@ -448,7 +423,6 @@ class HiraganaPracticeApp:
     
     def next_character(self):
         """Move to the next character."""
-        # Stop any currently playing audio
         try:
             pygame.mixer.music.stop()
         except:
@@ -461,7 +435,6 @@ class HiraganaPracticeApp:
     
     def previous_character(self):
         """Move to the previous character."""
-        # Stop any currently playing audio
         try:
             pygame.mixer.music.stop()
         except:
@@ -474,7 +447,6 @@ class HiraganaPracticeApp:
     
     def toggle_mode(self):
         """Toggle between Hiragana and Katakana."""
-        # Stop any currently playing audio
         try:
             pygame.mixer.music.stop()
         except:
@@ -496,11 +468,59 @@ class HiraganaPracticeApp:
         self.drawing_surface.fill(WHITE)
         self.drawing_strokes = []
         self.current_stroke = []
+        self.previous_pos = None
+    
+    def toggle_fullscreen(self):
+        """Toggle fullscreen mode with proper display detection for Lenovo Y1 Yoga."""
+        self.is_fullscreen = not self.is_fullscreen
+        
+        if self.is_fullscreen:
+            # Get fresh display info for current monitor
+            display_info = pygame.display.Info()
+            
+            # Store windowed size for restoration
+            self.windowed_size = (self.window_width, self.window_height)
+            
+            # Use pygame.FULLSCREEN flag for proper positioning on high-DPI displays
+            self.screen = pygame.display.set_mode(
+                (display_info.current_w, display_info.current_h),
+                pygame.FULLSCREEN
+            )
+            
+            # Update dimensions
+            self.window_width = display_info.current_w
+            self.window_height = display_info.current_h
+            
+            print(f"Fullscreen: {self.window_width}x{self.window_height}")
+        else:
+            # Restore windowed mode
+            self.screen = pygame.display.set_mode(
+                self.windowed_size,
+                pygame.RESIZABLE
+            )
+            
+            # Restore dimensions
+            self.window_width, self.window_height = self.windowed_size
+            
+            print(f"Windowed: {self.window_width}x{self.window_height}")
+        
+        # Recalculate layout for new size
+        self.calculate_layout()
+        self.update_fonts()
+        self.buttons = self.create_buttons()
+        
+        # Recreate drawing surface and preserve content by scaling
+        old_surface = self.drawing_surface.copy()
+        self.drawing_surface = pygame.Surface((self.window_width, self.window_height), pygame.SRCALPHA)
+        self.drawing_surface.fill(WHITE)
+        self.drawing_surface.set_colorkey(WHITE)
+        
+        # Scale old drawing to new size if there's content
+        if len(self.drawing_strokes) > 0:
+            pygame.transform.scale(old_surface, (self.window_width, self.window_height), self.drawing_surface)
     
     def handle_events(self):
-        """Handle pygame events."""
-        mouse_pos = pygame.mouse.get_pos()
-        
+        """Handle pygame events - PEN INPUT ONLY."""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
@@ -518,7 +538,7 @@ class HiraganaPracticeApp:
                 
                 # Resize drawing surface (preserve content)
                 old_surface = self.drawing_surface.copy()
-                self.drawing_surface = pygame.Surface((self.window_width, self.window_height))
+                self.drawing_surface = pygame.Surface((self.window_width, self.window_height), pygame.SRCALPHA)
                 self.drawing_surface.fill(WHITE)
                 self.drawing_surface.set_colorkey(WHITE)
                 self.drawing_surface.blit(old_surface, (0, 0))
@@ -526,9 +546,8 @@ class HiraganaPracticeApp:
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE or event.key == pygame.K_q:
                     self.running = False
-                elif event.key == pygame.K_F11:
-                    # Toggle fullscreen
-                    pygame.display.toggle_fullscreen()
+                elif event.key == pygame.K_F11 or event.key == pygame.K_f:
+                    self.toggle_fullscreen()
                 elif event.key == pygame.K_RIGHT or event.key == pygame.K_SPACE:
                     self.next_character()
                 elif event.key == pygame.K_LEFT:
@@ -541,194 +560,195 @@ class HiraganaPracticeApp:
                     self.speak_current_character()
                 elif event.key == pygame.K_g:
                     self.show_background = not self.show_background
-                elif event.key == pygame.K_p:
-                    # Toggle stylus mode with debug warning
-                    self.stylus_mode = not self.stylus_mode
-                    if self.stylus_mode and not self.stylus_detected:
-                        print("⚠️ DEBUG MODE: Stylus mode enabled with mouse (no stylus detected)")
-                        print("   Mouse will simulate pressure-sensitive brush strokes.")
             
-            # Button clicks
+            # PEN EVENTS - Detect pen proximity, touch, and pressure
+            # Mouse events used ONLY for button clicks - no drawing
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:  # Left click or touch
-                    # Check if any button was clicked
-                    button_clicked = False
-                    for button in self.buttons:
-                        if button['rect'].collidepoint(event.pos):
-                            button_clicked = True
-                            if button['action'] == 'next':
-                                self.next_character()
-                            elif button['action'] == 'previous':
-                                self.previous_character()
-                            elif button['action'] == 'clear':
-                                self.clear_drawing()
-                            elif button['action'] == 'toggle':
-                                self.toggle_mode()
-                            elif button['action'] == 'sound':
-                                self.speak_current_character()
-                            elif button['action'] == 'toggle_bg':
-                                self.show_background = not self.show_background
-                            elif button['action'] == 'toggle_stylus':
-                                self.stylus_mode = not self.stylus_mode
-                                if self.stylus_mode and not self.stylus_detected:
-                                    print("⚠️ DEBUG MODE: Stylus mode enabled with mouse (no stylus detected)")
-                                    print("   Mouse will simulate pressure-sensitive brush strokes.")
-                            elif button['action'] == 'quit':
-                                self.running = False
-                            break
-                    
-                    # If no button was clicked, start drawing
-                    if not button_clicked:
-                        self.drawing = True
-                        self.current_stroke = [event.pos]  # Start new stroke
-                        # Get pressure if available (stylus)
-                        if hasattr(event, 'pressure'):
-                            self.last_pressure = event.pressure
-                            if event.pressure > 0:
-                                self.stylus_detected = True
-                                if not self.stylus_mode:
-                                    self.stylus_mode = True  # Auto-enable
-                        else:
-                            self.last_pressure = 1.0
+                # Check for button clicks only
+                for button in self.buttons:
+                    if button['rect'].collidepoint(event.pos):
+                        if button['action'] == 'next':
+                            self.next_character()
+                        elif button['action'] == 'previous':
+                            self.previous_character()
+                        elif button['action'] == 'clear':
+                            self.clear_drawing()
+                        elif button['action'] == 'toggle':
+                            self.toggle_mode()
+                        elif button['action'] == 'sound':
+                            self.speak_current_character()
+                        elif button['action'] == 'toggle_bg':
+                            self.show_background = not self.show_background
+                        elif button['action'] == 'fullscreen':
+                            self.toggle_fullscreen()
+                        elif button['action'] == 'quit':
+                            self.running = False
+                        break
+                
+                # Check for pen/stylus input (has pressure attribute)
+                if hasattr(event, 'pressure') and event.pressure > 0:
+                    self.pen_detected = True
+                    self.pen_touching = True
+                    self.pen_pressure = event.pressure
+                    self.previous_pos = event.pos
+                    self.current_stroke = [self.previous_pos]
+                    print(f"✏️  Pen detected! Pressure: {event.pressure:.2f}")
             
             elif event.type == pygame.MOUSEBUTTONUP:
-                if event.button == 1:
-                    self.drawing = False
+                # Only handle pen lift
+                if hasattr(event, 'pressure') or self.pen_touching:
+                    self.pen_touching = False
+                    self.pen_pressure = 0.0
                     # Finish current stroke
-                    if len(self.current_stroke) > 2:  # Only save strokes with enough points
+                    if len(self.current_stroke) > 2:
                         self.drawing_strokes.append(self.current_stroke.copy())
                     self.current_stroke = []
+                    self.previous_pos = None
             
             elif event.type == pygame.MOUSEMOTION:
-                if self.drawing:
+                # Only handle pen motion (has pressure attribute)
+                if hasattr(event, 'pressure'):
+                    self.pen_pressure = event.pressure
                     pos = event.pos
                     
-                    # Get pressure if available
-                    pressure = self.last_pressure
-                    if hasattr(event, 'pressure') and event.pressure > 0:
-                        pressure = event.pressure
-                        self.last_pressure = pressure
-                        if not self.stylus_detected:
-                            self.stylus_detected = True
-                            if not self.stylus_mode:
-                                self.stylus_mode = True  # Auto-enable
-                    
-                    # Draw with stylus brush or regular pen
-                    if self.stylus_mode:
-                        self.draw_brush_stroke(pos, pressure)
-                        self.current_stroke.append(pos)  # Track stroke points
-                    else:
-                        prev_pos = (pos[0] - event.rel[0], pos[1] - event.rel[1])
-                        self.draw_pen_stroke(pos, prev_pos)
+                    if self.pen_pressure > 0:
+                        # Pen is touching - draw
+                        self.pen_detected = True
+                        self.pen_touching = True
+                        self.draw_smooth_pressure_stroke(pos, self.pen_pressure)
+                    elif self.pen_detected:
+                        # Pen is hovering - show preview (only if pen was previously detected)
+                        self.pen_in_proximity = True
+                        self.pen_touching = False
+                        self.draw_smooth_pressure_stroke(pos, 0.0)
     
-    def draw_character_background(self):
-        """Draw the opaque character in the background for tracing with stroke order guides."""
+    def draw(self):
+        """Draw the current frame."""
+        self.screen.fill(WHITE)
+        
+        # Get current character
         char, romanji = self.get_current_character()
         
-        # Render character with transparency
-        char_surface = self.char_font.render(char, True, (200, 200, 200))
-        char_surface = char_surface.convert_alpha()
-        char_surface.set_alpha(128)  # Set transparency level
-        char_rect = char_surface.get_rect(center=(self.window_width // 2, self.window_height // 2 - int(30 * self.scale_factor)))
-        
-        self.screen.blit(char_surface, char_rect)
-        
-        # Draw stroke order guides
-        stroke_hints = self.get_stroke_order_hints(char)
-        center_x = self.window_width // 2
-        center_y = self.window_height // 2 - int(30 * self.scale_factor)
-        
-        for i, (num, x_offset, y_offset) in enumerate(stroke_hints):
-            # Calculate position relative to character center
-            guide_x = center_x + int(x_offset * 200 * self.scale_factor)
-            guide_y = center_y + int(y_offset * 200 * self.scale_factor)
+        # Draw character in background (if enabled)
+        if self.show_background:
+            char_surface = self.char_font.render(char, True, LIGHT_GRAY)
+            char_rect = char_surface.get_rect(center=(self.window_width // 2, self.window_height // 3))
+            self.screen.blit(char_surface, char_rect)
             
-            # Draw numbered circle
-            circle_radius = int(18 * self.scale_factor)
-            pygame.draw.circle(self.screen, RED, (guide_x, guide_y), circle_radius)
-            pygame.draw.circle(self.screen, WHITE, (guide_x, guide_y), circle_radius - 2)
-            
-            # Draw number
-            num_surface = self.guide_font.render(str(num), True, RED)
-            num_rect = num_surface.get_rect(center=(guide_x, guide_y))
-            self.screen.blit(num_surface, num_rect)
-    
-    def draw_ui(self):
-        """Draw the user interface elements."""
-        char, romanji = self.get_current_character()
+            # Draw stroke order guides (numbered circles)
+            # This is a simplified version - you'd need actual stroke order data for accuracy
+            guide_positions = self.get_stroke_order_positions(char)
+            for i, pos in enumerate(guide_positions):
+                # Draw circle with number
+                circle_radius = int(15 * self.scale_factor)
+                pygame.draw.circle(self.screen, ORANGE, pos, circle_radius, 2)
+                guide_text = self.guide_font.render(str(i + 1), True, ORANGE)
+                guide_rect = guide_text.get_rect(center=pos)
+                self.screen.blit(guide_text, guide_rect)
         
-        margin = int(20 * self.scale_factor)
+        # Draw user's drawing
+        self.screen.blit(self.drawing_surface, (0, 0))
+        
+        # Draw UI elements
+        margin = int(15 * self.scale_factor)
         
         # Draw mode indicator
         mode_text = f"Mode: {self.mode.capitalize()} | Press F11 for fullscreen"
         mode_surface = self.ui_font.render(mode_text, True, BLUE)
         self.screen.blit(mode_surface, (margin, margin))
         
-        # Draw stylus status if enabled
-        if self.stylus_mode:
-            stylus_text = "✏️ Stylus Mode"
-            stylus_surface = self.small_font.render(stylus_text, True, PURPLE)
-            self.screen.blit(stylus_surface, (self.window_width - margin - stylus_surface.get_width(), margin))
+        # Draw pen status
+        if self.pen_detected:
+            if self.pen_touching:
+                pen_status = f"✏️ Pen Active (Pressure: {self.pen_pressure:.0%})"
+                pen_color = GREEN
+            elif self.pen_in_proximity:
+                pen_status = "✏️ Pen Hovering"
+                pen_color = ORANGE
+            else:
+                pen_status = "✏️ Pen Ready"
+                pen_color = BLUE
+        else:
+            pen_status = "⚠️ Waiting for pen..."
+            pen_color = RED
         
-        # Draw character counter and stroke count
-        counter_text = f"Character: {self.character_index + 1}/{len(self.character_set)} | Strokes: {len(self.drawing_strokes)}"
-        counter_surface = self.small_font.render(counter_text, True, BLACK)
-        self.screen.blit(counter_surface, (margin, margin + int(40 * self.scale_factor)))
+        pen_surface = self.small_font.render(pen_status, True, pen_color)
+        self.screen.blit(pen_surface, (self.window_width - margin - pen_surface.get_width(), margin))
         
-        # Draw romanji pronunciation (larger and centered)
-        romanji_text = f"Romanji: {romanji}"
-        romanji_surface = self.ui_font.render(romanji_text, True, GREEN)
-        romanji_rect = romanji_surface.get_rect(center=(self.window_width // 2, int(40 * self.scale_factor)))
+        # Draw character info
+        romanji_text = f"({romanji}) - {self.character_index + 1}/{len(self.character_set)}"
+        romanji_surface = self.ui_font.render(romanji_text, True, DARK_GRAY)
+        romanji_rect = romanji_surface.get_rect(center=(self.window_width // 2, self.window_height // 2 + int(150 * self.scale_factor)))
         self.screen.blit(romanji_surface, romanji_rect)
         
-        # Draw buttons with keybinds
+        # Draw buttons
         mouse_pos = pygame.mouse.get_pos()
         for button in self.buttons:
-            # Check if mouse is hovering over button
-            color = BUTTON_HOVER if button['rect'].collidepoint(mouse_pos) else button['color']
+            # Check if hovering
+            is_hovering = button['rect'].collidepoint(mouse_pos)
+            color = BUTTON_HOVER if is_hovering else button['color']
             
-            # Draw button background
-            pygame.draw.rect(self.screen, color, button['rect'], border_radius=int(8 * self.scale_factor))
-            pygame.draw.rect(self.screen, BLACK, button['rect'], max(int(2 * self.scale_factor), 1), border_radius=int(8 * self.scale_factor))
+            # Draw button
+            pygame.draw.rect(self.screen, color, button['rect'], border_radius=8)
+            pygame.draw.rect(self.screen, DARK_GRAY, button['rect'], 2, border_radius=8)
             
             # Draw button text
             text_surface = self.button_font.render(button['text'], True, WHITE)
-            text_rect = text_surface.get_rect(center=(button['rect'].centerx, button['rect'].centery - int(8 * self.scale_factor)))
+            text_rect = text_surface.get_rect(center=button['rect'].center)
             self.screen.blit(text_surface, text_rect)
             
-            # Draw keybind label below button text
+            # Draw keybind hint
             keybind_surface = self.keybind_font.render(f"[{button['keybind']}]", True, WHITE)
-            keybind_rect = keybind_surface.get_rect(center=(button['rect'].centerx, button['rect'].centery + int(12 * self.scale_factor)))
+            keybind_rect = keybind_surface.get_rect(centerx=button['rect'].centerx, 
+                                                    top=button['rect'].bottom + 2)
             self.screen.blit(keybind_surface, keybind_rect)
-    
-    def render(self):
-        """Render the application."""
-        # Fill background
-        self.screen.fill(WHITE)
         
-        # Draw the opaque character for tracing (if enabled)
-        if self.show_background:
-            self.draw_character_background()
-        
-        # Draw the user's drawing on top
-        self.screen.blit(self.drawing_surface, (0, 0))
-        
-        # Draw confetti
+        # Draw confetti if celebrating
         self.draw_confetti()
         
-        # Draw UI elements
-        self.draw_ui()
-        
-        # Update display
         pygame.display.flip()
     
+    def get_stroke_order_positions(self, char):
+        """Get approximate positions for stroke order guides.
+        This is a simplified version - ideally would use actual stroke data.
+        """
+        # Center position
+        cx = self.window_width // 2
+        cy = self.window_height // 3
+        offset = int(60 * self.scale_factor)
+        
+        # Simple positioning based on character complexity
+        # In a real implementation, you'd have stroke data for each character
+        positions = [
+            (cx - offset, cy - offset),
+            (cx, cy - offset),
+            (cx + offset, cy - offset),
+            (cx - offset, cy + offset),
+        ]
+        return positions[:min(4, len(positions))]  # Limit to 4 guides
+    
     def run(self):
-        """Main application loop."""
+        """Main game loop."""
         while self.running:
+            # Handle events
             self.handle_events()
-            self.check_character_completion()
+            
+            # Check for character completion (only when not drawing)
+            if not self.character_completed:
+                if self.check_character_completion():
+                    self.character_completed = True
+                    print("✓ Character completed!")
+                    if self.success_sound:
+                        self.success_sound.play()
+                    self.create_confetti()
+            
+            # Update confetti
             self.update_confetti()
-            self.render()
+            
+            # Draw everything
+            self.draw()
+            
+            # Maintain framerate
             self.clock.tick(FPS)
         
         pygame.quit()
