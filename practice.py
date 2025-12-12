@@ -546,6 +546,17 @@ class HiraganaPracticeApp:
                         print("   → Next character")
                         self.next_character()
                 elif event.button == 1:  # Pen tip
+                    # DEBUG: Show ALL event attributes
+                    print(f"\n🔍 MOUSEBUTTONDOWN EVENT DEBUG:")
+                    print(f"   All attributes: {dir(event)}")
+                    print(f"   Has 'pressure': {hasattr(event, 'pressure')}")
+                    if hasattr(event, 'pressure'):
+                        print(f"   event.pressure = {event.pressure}")
+                    if hasattr(event, 'touch'):
+                        print(f"   event.touch = {event.touch}")
+                    if hasattr(event, 'window'):
+                        print(f"   event.window = {event.window}")
+                    
                     if hasattr(event, 'pressure'):
                         raw_pressure = event.pressure
                         if raw_pressure > 1.0:
@@ -555,6 +566,7 @@ class HiraganaPracticeApp:
                         self.pen_pressure = pow(raw_pressure, 0.3)  # Was 0.7, now 0.3 for more sensitivity
                         print(f"✏️  Pen down - Raw: {raw_pressure:.4f}, Adjusted: {self.pen_pressure:.4f}")
                     else:
+                        print(f"⚠️  NO PRESSURE ATTRIBUTE - Using default 0.5")
                         self.pen_pressure = 0.5  # Default to 50% instead of 100%
                     
                     self.pen_touching = True
@@ -583,8 +595,16 @@ class HiraganaPracticeApp:
                         raw_pressure = raw_pressure / 65535.0
                     
                     # Much more aggressive curve - cube root
-                    self.pen_pressure = pow(raw_pressure, 0.3)
+                    adjusted = pow(raw_pressure, 0.3)
                     
+                    # Only print occasionally to avoid spam (every 10th frame)
+                    if not hasattr(self, '_motion_debug_counter'):
+                        self._motion_debug_counter = 0
+                    self._motion_debug_counter += 1
+                    if self._motion_debug_counter % 10 == 0:
+                        print(f"📍 MOTION - Raw: {raw_pressure:.4f}, Adjusted: {adjusted:.4f}")
+                    
+                    self.pen_pressure = adjusted
                     pos = event.pos
                     
                     if self.pen_pressure > 0.05:  # Higher threshold
