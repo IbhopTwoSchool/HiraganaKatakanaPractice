@@ -53,7 +53,7 @@ class HiraganaPracticeApp:
         self.drawing_surface.set_colorkey(WHITE)  # Make white transparent
         
         # Pen/stylus support - pygame handles this through mouse events
-        # Pressure sensitivity available through pygame.mouse.get_cursor()
+        # Pressure sensitivity may be available through event.pressure in pen events
         
         # Font for characters and UI
         try:
@@ -61,7 +61,7 @@ class HiraganaPracticeApp:
             self.char_font = pygame.font.Font(None, 400)  # Large for character display
             self.ui_font = pygame.font.Font(None, 36)
             self.small_font = pygame.font.Font(None, 24)
-        except:
+        except pygame.error:
             self.char_font = pygame.font.SysFont('arial', 400)
             self.ui_font = pygame.font.SysFont('arial', 36)
             self.small_font = pygame.font.SysFont('arial', 24)
@@ -127,20 +127,21 @@ class HiraganaPracticeApp:
                     # Draw on the drawing surface
                     pos = event.pos
                     # Connect previous position to current for smooth lines
-                    if hasattr(event, 'rel'):
-                        prev_pos = (pos[0] - event.rel[0], pos[1] - event.rel[1])
-                        pygame.draw.line(self.drawing_surface, PEN_COLOR, 
-                                       prev_pos, pos, PEN_WIDTH)
-                    else:
-                        pygame.draw.circle(self.drawing_surface, PEN_COLOR, 
-                                         pos, PEN_WIDTH // 2)
+                    prev_pos = (pos[0] - event.rel[0], pos[1] - event.rel[1])
+                    pygame.draw.line(self.drawing_surface, PEN_COLOR, 
+                                   prev_pos, pos, PEN_WIDTH)
+                    # Draw a circle at current position for smooth appearance
+                    pygame.draw.circle(self.drawing_surface, PEN_COLOR, 
+                                     pos, PEN_WIDTH // 2)
     
     def draw_character_background(self):
         """Draw the opaque character in the background for tracing."""
         char = self.get_current_character()
         
         # Render character with transparency
-        char_surface = self.char_font.render(char, True, (200, 200, 200, 128))
+        char_surface = self.char_font.render(char, True, (200, 200, 200))
+        char_surface = char_surface.convert_alpha()
+        char_surface.set_alpha(128)  # Set transparency level
         char_rect = char_surface.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2))
         
         self.screen.blit(char_surface, char_rect)
