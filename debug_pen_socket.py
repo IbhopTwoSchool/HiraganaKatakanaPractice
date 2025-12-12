@@ -17,8 +17,23 @@ import sys
 import time
 import threading
 import ctypes
-from ctypes import wintypes, POINTER, WINFUNCTYPE, c_int, c_void_p, Structure
 import subprocess
+
+# Check if running on Windows
+if sys.platform != 'win32':
+    print("\n" + "="*70)
+    print("ERROR: Windows Only")
+    print("="*70)
+    print("This pen socket detection tool only works on Windows.")
+    print("You are running on:", sys.platform)
+    print("\nThis tool requires Windows-specific APIs:")
+    print("- WINFUNCTYPE, wintypes (Windows ctypes)")
+    print("- Win32 device change messages")
+    print("- Windows Registry and WMI")
+    print("\nPlease run this script on your Windows machine (Lenovo Y1 Yoga).")
+    sys.exit(1)
+
+from ctypes import wintypes, POINTER, WINFUNCTYPE, c_int, c_void_p, Structure
 
 print("\n" + "="*70)
 print("PEN SOCKET DETECTION DEBUG TOOL")
