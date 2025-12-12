@@ -153,6 +153,44 @@ def install_font_windows(font_path):
         return False
 
 
+def refresh_font_cache():
+    """Refresh Windows font cache after installation."""
+    print("\n[Step 5] Refreshing font cache...\n")
+    try:
+        # Method 1: Broadcast WM_FONTCHANGE message
+        import ctypes
+        from ctypes import wintypes
+        
+        HWND_BROADCAST = 0xFFFF
+        WM_FONTCHANGE = 0x001D
+        SMTO_ABORTIFHUNG = 0x0002
+        
+        result = ctypes.c_long()
+        ctypes.windll.user32.SendMessageTimeoutW(
+            HWND_BROADCAST,
+            WM_FONTCHANGE,
+            0,
+            0,
+            SMTO_ABORTIFHUNG,
+            5000,
+            ctypes.byref(result)
+        )
+        print("  ✓ Font cache refresh message sent")
+        
+        # Method 2: Clear pygame font cache
+        try:
+            pygame.quit()
+            pygame.init()
+            print("  ✓ Pygame font cache cleared")
+        except:
+            pass
+        
+        return True
+    except Exception as e:
+        print(f"  ⚠ Could not refresh font cache: {e}")
+        return False
+
+
 def main():
     """Main font checker and installer."""
     print("=" * 60)
@@ -211,7 +249,9 @@ def main():
     
     if len(working_fonts) >= 1:
         print("\n✓ Your system has sufficient Japanese font support!")
-        print("  The practice application should work correctly.\n")
+        print("  The practice application should work correctly.")
+        print("\n⚠️  Note: If you just installed fonts, restart practice.py!")
+        print("  Fonts require application restart to take effect.\n")
         return 0
     else:
         print("\n⚠️  Your system needs Japanese font support!")
@@ -231,10 +271,18 @@ def main():
                 print("\n[Step 4] Installing font...\n")
                 if install_font_windows(font_path):
                     print("\n✓ Font installation successful!")
+                    
+                    # Refresh font cache
+                    refresh_font_cache()
+                    
+                    print("\n⚠️  IMPORTANT: You must restart the practice application!")
+                    print("   1. Close practice.py if it's running")
+                    print("   2. Run practice.py again to use the new fonts")
                 else:
                     print(f"\n⚠️  Please manually install the font from: {font_path}")
                     print("   1. Double-click the font file")
                     print("   2. Click 'Install' in the font preview window")
+                    print("   3. Restart the practice application")
         
         return 1
 
