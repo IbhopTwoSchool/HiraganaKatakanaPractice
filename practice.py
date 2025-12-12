@@ -56,19 +56,11 @@ class HiraganaPracticeApp:
     
     def __init__(self):
         """Initialize the application."""
-        # DEBUG: Show what we're trying to create
-        print(f"🖥️  INITIALIZING: {WINDOW_WIDTH}x{WINDOW_HEIGHT}")
-        print(f"🖥️  Screen detected: {SCREEN_WIDTH}x{SCREEN_HEIGHT}")
-        
         # Borderless fullscreen - fills entire screen without window decorations
         self.screen = pygame.display.set_mode(
             (WINDOW_WIDTH, WINDOW_HEIGHT),
             pygame.NOFRAME
         )
-        
-        # DEBUG: Verify what we actually got
-        actual_size = self.screen.get_size()
-        print(f"✅ WINDOW CREATED: {actual_size[0]}x{actual_size[1]}")
         
         pygame.display.set_caption("Hiragana & Katakana Practice")
         self.clock = pygame.time.Clock()
@@ -105,6 +97,10 @@ class HiraganaPracticeApp:
         self.character_completed = False
         self.last_check_time = 0
         self.check_interval = 0.5  # Check every 0.5 seconds
+        
+        # Progressive stroke guide system
+        self.current_stroke_guide = 0  # Which stroke guide to show (0-indexed)
+        self.total_stroke_guides = 0  # Total number of strokes for current character
         
         # Confetti particles
         self.confetti_particles = []
@@ -394,7 +390,6 @@ class HiraganaPracticeApp:
     
     def reset_tts(self):
         """Reset TTS system after failure."""
-        print("🔄 Resetting TTS system...")
         try:
             with self.tts_lock:
                 # Stop and unload everything
@@ -409,8 +404,8 @@ class HiraganaPracticeApp:
                     pygame.mixer.quit()
                     time.sleep(0.2)
                     pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
-                except Exception as e:
-                    print(f"Mixer reset error: {e}")
+                except:
+                    pass
                 
                 # Force garbage collection
                 import gc
@@ -424,9 +419,9 @@ class HiraganaPracticeApp:
                 self.tts_retry_attempts = 0
                 self.tts_enabled = True
                 
-                print("✅ TTS system reset complete")
+                print("✅ TTS reset")
         except Exception as e:
-            print(f"❌ TTS reset failed: {e}")
+            print(f"❌ TTS reset failed")
     
     def speak_current_character(self):
         """Speak the current character using Google TTS in Japanese with robust error handling."""
@@ -452,19 +447,17 @@ class HiraganaPracticeApp:
                         try:
                             pygame.mixer.music.stop()
                             pygame.mixer.music.unload()
-                        except Exception as cleanup_err:
-                            print(f"Pre-cleanup warning: {cleanup_err}")
+                        except:
+                            pass
                         
                         # Small delay to ensure cleanup
                         time.sleep(0.1)
                         
                         # Verify mixer is initialized
                         if not pygame.mixer.get_init():
-                            print("🔧 Reinitializing pygame mixer")
                             pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
                         
                         # Create Japanese TTS audio
-                        print(f"🔊 Generating TTS for '{char}' (attempt {attempt + 1}/{max_retries})")
                         tts = gTTS(text=char, lang='ja', slow=False)
                         
                         # Save to temporary file
@@ -475,8 +468,6 @@ class HiraganaPracticeApp:
                         # Verify file was created and has content
                         if not os.path.exists(temp_file) or os.path.getsize(temp_file) == 0:
                             raise Exception(f"TTS file creation failed: {temp_file}")
-                        
-                        print(f"✅ TTS file created: {os.path.getsize(temp_file)} bytes")
                         
                         # Play the audio
                         pygame.mixer.music.load(temp_file)
@@ -510,7 +501,6 @@ class HiraganaPracticeApp:
                         self.tts_error_count = 0
                         self.tts_retry_attempts = 0
                         self.tts_failed = False
-                        print(f"✅ TTS playback successful for '{char}'")
                         
                         # Break retry loop on success
                         break
@@ -607,6 +597,7 @@ class HiraganaPracticeApp:
         self.drawing_strokes = []
         self.current_stroke = []
         self.previous_pos = None
+        self.current_stroke_guide = 0  # Reset to first stroke guide
     
 
     
@@ -617,10 +608,8 @@ class HiraganaPracticeApp:
                 self.running = False
             
             elif event.type == pygame.VIDEORESIZE:
-                # DEBUG: Track any resize attempts
-                print(f"⚠️  VIDEORESIZE EVENT: {event.w}x{event.h}")
-                print(f"⚠️  This should NOT happen with NOFRAME!")
                 # DO NOT change display mode - stay in NOFRAME
+                pass
             
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE or event.key == pygame.K_q:
@@ -641,8 +630,6 @@ class HiraganaPracticeApp:
                 elif event.key == pygame.K_m:
                     # M: Toggle TTS on/off (Mute)
                     self.tts_enabled = not self.tts_enabled
-                    status = "enabled" if self.tts_enabled else "disabled"
-                    print(f"🔊 TTS {status}")
                 elif event.key == pygame.K_g:
                     self.show_background = not self.show_background
             
@@ -670,12 +657,9 @@ class HiraganaPracticeApp:
                 
                 # Check for pen/stylus input - try ALL buttons for stylus side buttons
                 if event.button in [2, 3, 4, 5, 6, 7, 8, 9, 10]:  # Try many button numbers
-                    print(f"🔘 STYLUS BUTTON DETECTED: {event.button}")
                     if event.button in [2, 3, 8]:
-                        print("   → Previous character")
                         self.previous_character()
                     elif event.button in [4, 5, 9, 10]:
-                        print("   → Next character")
                         self.next_character()
                 elif event.button == 1:  # Pen tip
                     # DEBUG: Show ALL event attributes
@@ -710,9 +694,12 @@ class HiraganaPracticeApp:
                 if hasattr(event, 'pressure') or self.pen_touching:
                     self.pen_touching = False
                     self.pen_pressure = 0.0
-                    # Finish current stroke
+                    # Finish current stroke and advance guide
                     if len(self.current_stroke) > 2:
                         self.drawing_strokes.append(self.current_stroke.copy())
+                        # Advance to next stroke guide when user completes a stroke
+                        if self.current_stroke_guide < self.total_stroke_guides - 1:
+                            self.current_stroke_guide += 1
                     self.current_stroke = []
                     self.previous_pos = None
             
@@ -728,13 +715,6 @@ class HiraganaPracticeApp:
                     
                     # Much more aggressive curve - cube root
                     adjusted = pow(raw_pressure, 0.3)
-                    
-                    # Only print occasionally to avoid spam (every 10th frame)
-                    if not hasattr(self, '_motion_debug_counter'):
-                        self._motion_debug_counter = 0
-                    self._motion_debug_counter += 1
-                    if self._motion_debug_counter % 10 == 0:
-                        print(f"📍 MOTION - Raw: {raw_pressure:.4f}, Adjusted: {adjusted:.4f}")
                     
                     self.pen_pressure = adjusted
                     pos = event.pos
@@ -765,59 +745,22 @@ class HiraganaPracticeApp:
             char_rect = char_surface.get_rect(center=(self.window_width // 2, self.window_height // 3))
             self.screen.blit(char_surface, char_rect)
             
-            # Draw stroke order guides as lines with arrows
+            # Draw progressive stroke guide - only show current stroke
             stroke_paths = self.get_stroke_paths(char)
-            for i, path in enumerate(stroke_paths):
-                # Color gradient for each stroke
-                progress = i / max(1, len(stroke_paths) - 1)
-                stroke_color = (
-                    int(255 - 100 * progress),  # R: 255->155
-                    int(50 + 150 * progress),   # G: 50->200
-                    int(50)                      # B: constant
-                )
+            self.total_stroke_guides = len(stroke_paths)
+            
+            # Only show the current stroke the user should draw
+            if self.current_stroke_guide < len(stroke_paths):
+                path = stroke_paths[self.current_stroke_guide]
                 
-                # Draw the stroke path as a thick line
+                # Use a semi-transparent guide color
+                guide_color = (100, 150, 255)  # Light blue guide
+                
+                # Draw the stroke path as a thick semi-transparent line
                 if len(path) >= 2:
-                    thickness = int(6 * self.scale_factor)
-                    pygame.draw.lines(self.screen, stroke_color, False, path, thickness)
-                    
-                    # Draw arrowhead at the end of the stroke
-                    end_point = path[-1]
-                    if len(path) >= 2:
-                        # Calculate arrow direction from last two points
-                        prev_point = path[-2]
-                        dx = end_point[0] - prev_point[0]
-                        dy = end_point[1] - prev_point[1]
-                        length = max(1, (dx*dx + dy*dy)**0.5)
-                        
-                        # Normalize direction
-                        dx /= length
-                        dy /= length
-                        
-                        # Arrow size
-                        arrow_size = int(20 * self.scale_factor)
-                        arrow_width = int(12 * self.scale_factor)
-                        
-                        # Calculate arrow points (triangular arrowhead)
-                        arrow_tip = end_point
-                        arrow_base = (
-                            int(end_point[0] - dx * arrow_size),
-                            int(end_point[1] - dy * arrow_size)
-                        )
-                        # Perpendicular vector for arrow wings
-                        perp_x, perp_y = -dy, dx
-                        arrow_left = (
-                            int(arrow_base[0] + perp_x * arrow_width),
-                            int(arrow_base[1] + perp_y * arrow_width)
-                        )
-                        arrow_right = (
-                            int(arrow_base[0] - perp_x * arrow_width),
-                            int(arrow_base[1] - perp_y * arrow_width)
-                        )
-                        
-                        # Draw filled arrow
-                        pygame.draw.polygon(self.screen, stroke_color, 
-                                          [arrow_tip, arrow_left, arrow_right])
+                    thickness = int(8 * self.scale_factor)
+                    # Draw with slight transparency effect by drawing thinner overlays
+                    pygame.draw.lines(self.screen, guide_color, False, path, thickness)
         
         # Draw user's drawing
         self.screen.blit(self.drawing_surface, (0, 0))
@@ -841,8 +784,12 @@ class HiraganaPracticeApp:
         pen_surface = self.small_font.render(pen_status, True, pen_color)
         self.screen.blit(pen_surface, (self.window_width - margin - pen_surface.get_width(), margin))
         
-        # Draw character info
-        romanji_text = f"({romanji}) - {self.character_index + 1}/{len(self.character_set)}"
+        # Draw character info with stroke progress
+        if self.total_stroke_guides > 0:
+            progress_text = f"Stroke {self.current_stroke_guide + 1}/{self.total_stroke_guides}"
+            romanji_text = f"({romanji}) - {self.character_index + 1}/{len(self.character_set)} | {progress_text}"
+        else:
+            romanji_text = f"({romanji}) - {self.character_index + 1}/{len(self.character_set)}"
         romanji_surface = self.ui_font.render(romanji_text, True, DARK_GRAY)
         romanji_rect = romanji_surface.get_rect(center=(self.window_width // 2, self.window_height // 2 + int(150 * self.scale_factor)))
         self.screen.blit(romanji_surface, romanji_rect)
