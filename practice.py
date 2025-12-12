@@ -839,16 +839,18 @@ class HiraganaPracticeApp:
         # We need to scale this to match the actual rendered character size
         coord_range = 120  # -60 to +60 = 120 unit range
         
-        # Use the larger dimension of the character for scaling
-        char_size = max(char_rect.width, char_rect.height)
-        scale = char_size / coord_range
+        # Use the character width and height for more accurate scaling
+        # Scale based on actual dimensions, not just max
+        scale_x = char_rect.width / coord_range
+        scale_y = char_rect.height / coord_range
         
         # Convert relative to absolute positions with proper scaling and positioning
+        # FLIP Y-AXIS: Computer graphics Y goes down, stroke data Y goes up
         absolute_paths = []
         for idx, path in enumerate(relative_paths):
-            # Scale coordinates and offset to character center
+            # Scale coordinates, flip Y-axis, and offset to character center
             absolute_path = [
-                (int(cx + x * scale), int(cy + y * scale)) 
+                (int(cx + x * scale_x), int(cy - y * scale_y))  # Note the MINUS for Y
                 for x, y in path
             ]
             absolute_paths.append(absolute_path)
