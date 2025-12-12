@@ -592,33 +592,26 @@ class HiraganaPracticeApp:
                             self.running = False
                         break
                 
-                # Check for pen/stylus input
-                # Debug: print all button presses
-                print(f"🔘 Button pressed: {event.button}")
-                
-                # Try various button numbers for stylus buttons
-                if event.button in [2, 3, 8, 9]:  # Common stylus button numbers
-                    if event.button in [2, 8]:
-                        # Stylus button 1 - Previous
-                        print("✏️  Stylus button 1 pressed (Previous)")
-                        self.prev_character()
-                    elif event.button in [3, 9]:
-                        # Stylus button 2 - Next
-                        print("✏️  Stylus button 2 pressed (Next)")
+                # Check for pen/stylus input - try ALL buttons for stylus side buttons
+                if event.button in [2, 3, 4, 5, 6, 7, 8, 9, 10]:  # Try many button numbers
+                    print(f"🔘 STYLUS BUTTON DETECTED: {event.button}")
+                    if event.button in [2, 3, 8]:
+                        print("   → Previous character")
+                        self.previous_character()
+                    elif event.button in [4, 5, 9, 10]:
+                        print("   → Next character")
                         self.next_character()
                 elif event.button == 1:  # Pen tip
                     if hasattr(event, 'pressure'):
-                        # Use actual pressure value, clamped to reasonable range
                         raw_pressure = event.pressure
-                        # Many styluses report 0-1 range, but some report 0-65535
                         if raw_pressure > 1.0:
                             raw_pressure = raw_pressure / 65535.0
-                        # Apply curve to make pressure more sensitive at low end
-                        self.pen_pressure = raw_pressure ** 0.7  # Gamma correction
-                        print(f"✏️  Pen down - Raw: {event.pressure:.4f}, Adjusted: {self.pen_pressure:.4f}")
+                        
+                        # Much more aggressive curve - cube root for very gradual buildup
+                        self.pen_pressure = pow(raw_pressure, 0.3)  # Was 0.7, now 0.3 for more sensitivity
+                        print(f"✏️  Pen down - Raw: {raw_pressure:.4f}, Adjusted: {self.pen_pressure:.4f}")
                     else:
-                        # Fallback for devices without pressure
-                        self.pen_pressure = 1.0
+                        self.pen_pressure = 0.5  # Default to 50% instead of 100%
                     
                     self.pen_touching = True
                     self.previous_pos = event.pos
@@ -645,12 +638,12 @@ class HiraganaPracticeApp:
                     if raw_pressure > 1.0:
                         raw_pressure = raw_pressure / 65535.0
                     
-                    # Apply gamma correction for better pressure curve
-                    self.pen_pressure = raw_pressure ** 0.7
+                    # Much more aggressive curve - cube root
+                    self.pen_pressure = pow(raw_pressure, 0.3)
                     
                     pos = event.pos
                     
-                    if self.pen_pressure > 0.01:  # Small threshold to avoid noise
+                    if self.pen_pressure > 0.05:  # Higher threshold
                         # Pen is touching - draw
                         self.pen_touching = True
                         self.draw_smooth_pressure_stroke(pos, self.pen_pressure)
@@ -694,7 +687,7 @@ class HiraganaPracticeApp:
         margin = int(15 * self.scale_factor)
         
         # Draw mode indicator
-        mode_text = f"Mode: {self.mode.capitalize()} | Press F11 for fullscreen"
+        mode_text = f"Mode: {self.mode.capitalize()} | Use Super+F to fullscreen in Hyprland"
         mode_surface = self.ui_font.render(mode_text, True, BLUE)
         self.screen.blit(mode_surface, (margin, margin))
         
