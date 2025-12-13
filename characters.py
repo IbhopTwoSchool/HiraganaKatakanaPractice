@@ -103,51 +103,67 @@ KATAKANA = [char for char, _ in KATAKANA_DATA]
 CHARACTER_INFO = {
     # Hiragana vowels
     'あ': {
-        'origin': 'Derived from cursive 安 (an, "peace")',
-        'usage': 'First character in gojūon order. Used in particles and verb conjugations.',
-        'notes': 'Pronounced with an open mouth, like "ah".',
-        'words': ['愛 (あい, ai) - love', '赤 (あか, aka) - red']
+        'origin': 'Derived from cursive 安 (an, "peace"). The kanji 安 shows woman (女) under roof (宀), representing safety.',
+        'usage': 'First character in gojūon order. Essential particle in ああ (aa, "ah, yes"). Used as indefinite prefix: あの人 (ano hito, "that person"). Appears in verb conjugations and many core words.',
+        'notes': 'Pronounced with an open mouth, like "ah" in "father". The stroke order starts with the left hook. Memory tip: Looks like a lowercase "a" with extra flourish. Essential for beginners as it starts the entire syllabary system.',
+        'words': ['愛 (あい, ai) - love', '赤 (あか, aka) - red', 'ある (aru) - to exist/have', 'あなた (anata) - you', 'あさ (asa) - morning', 'あした (ashita) - tomorrow']
     },
     'い': {
-        'origin': 'Derived from cursive 以 (i, "by means of")',
-        'usage': 'Common in adjective endings: 大きい (ookii - big).',
-        'notes': 'Pronounced like "ee" in "see".',
-        'words': ['犬 (いぬ, inu) - dog', '家 (いえ, ie) - house']
+        'origin': 'Derived from cursive 以 (i, "by means of"). The radical means "to use" or "by means of".',
+        'usage': 'Common in adjective endings: all -i adjectives end with い (大きい ookii - big, 小さい chiisai - small). Essential for conjugation. Also used in いい (ii, "good") - one of the most common words.',
+        'notes': 'Pronounced like "ee" in "see", but shorter. Two simple strokes. Memory tip: Looks like two vertical lines standing side by side, like "ii" (two i\'s). Critical for adjective system - all Japanese adjectives end in い.',
+        'words': ['犬 (いぬ, inu) - dog', '家 (いえ, ie) - house', 'いい (ii) - good', 'いる (iru) - to exist (animate)', 'いく (iku) - to go', '石 (いし, ishi) - stone']
     },
     'う': {
-        'origin': 'Derived from cursive 宇 (u, "universe")',
-        'usage': 'Used in verb endings. う段 (u-dan) is important for conjugation.',
-        'notes': 'Lips rounded less than English "oo".',
-        'words': ['馬 (うま, uma) - horse', '海 (うみ, umi) - sea']
+        'origin': 'Derived from cursive 宇 (u, "universe"). Character originally meant space/eaves, representing vastness.',
+        'usage': 'Used in verb endings - う段 (u-dan) is crucial for dictionary form verbs: 食べる (taberu) → 食べます (tabemasu). The う sound marks polite negative: 行かない (ikanai, "don\'t go"). Long vowel marker after o-sounds.',
+        'notes': 'Lips rounded less than English "oo", more compressed. Looks like a smiling face. Memory tip: The curve resembles a smile - think "oooh!" Critical for verb conjugation patterns.',
+        'words': ['馬 (うま, uma) - horse', '海 (うみ, umi) - sea', 'うえ (ue) - above', 'うち (uchi) - home/inside', 'うた (uta) - song', 'うし (ushi) - cow']
     },
     'え': {
-        'origin': 'Derived from cursive 衣 (e, "clothing")',
-        'usage': 'Common in potential form verbs.',
-        'notes': 'Pronounced like "eh" in "get".',
-        'words': ['駅 (えき, eki) - station', '絵 (え, e) - picture']
+        'origin': 'Derived from cursive 衣 (e, "clothing"). The radical represents garments and covering.',
+        'usage': 'Common in potential form verbs: 食べられる (taberareru) uses え段. Direction particle へ is written with this but pronounced "e". Used in many question words: 何 (なに/なん, nani/nan) becomes なんですか (nandesuka).',
+        'notes': 'Pronounced like "eh" in "get", between "eh" and "ay". Two strokes. Memory tip: Looks like exotic bird or hieroglyph. Important for potential verb forms.',
+        'words': ['駅 (えき, eki) - station', '絵 (え, e) - picture', 'えん (en) - yen/circle', 'えいが (eiga) - movie', 'えんぴつ (enpitsu) - pencil']
     },
     'お': {
-        'origin': 'Derived from cursive 於 (o, "at/in")',
-        'usage': 'Polite prefix お～ (o~) for honorifics.',
-        'notes': 'Pronounced with rounded lips, like "oh".',
-        'words': ['男 (おとこ, otoko) - man', 'お茶 (おちゃ, ocha) - tea']
+        'origin': 'Derived from cursive 於 (o, "at/in"). The kanji 於 originally meant "to be at" or "in/at" location.',
+        'usage': 'Polite prefix お～ (o~) for honorifics: お茶 (ocha, tea), お金 (okane, money). Direction/object particle を is written with this but pronounced "o". Shows respect when added to nouns.',
+        'notes': 'Pronounced with rounded lips, like "oh" in "go". Three strokes forming distinctive shape. Memory tip: Looks like "o" with tail. Essential for politeness - adding お shows respect.',
+        'words': ['男 (おとこ, otoko) - man', 'お茶 (おちゃ, ocha) - tea', 'おおきい (ookii) - big', 'おかあさん (okaasan) - mother', 'おとうと (otouto) - younger brother']
     },
     
     # K-row hiragana
     'か': {
-        'origin': 'Derived from cursive 加 (ka, "add")',
-        'usage': 'Question particle か (ka) marks yes/no questions.',
-        'notes': 'か is one of the most common particles in Japanese.',
-        'words': ['顔 (かお, kao) - face', '風 (かぜ, kaze) - wind']
+        'origin': 'Derived from cursive 加 (ka, "add"). The kanji combines 力 (power) and 口 (mouth), suggesting forceful speech.',
+        'usage': 'Question particle か (ka) marks yes/no questions - THE most important particle for beginners. 行きますか (ikimasu ka, "Will you go?"). Also marks alternatives: AかB (A ka B, "A or B"). Essential for question formation.',
+        'notes': 'か is one of the most common particles in Japanese. Unvoiced /k/ sound. Memory tip: Looks like someone raising hand to ask question. RULE: か at sentence end always makes it a question.',
+        'words': ['顔 (かお, kao) - face', '風 (かぜ, kaze) - wind', 'かく (kaku) - to write', 'かう (kau) - to buy', 'かみ (kami) - paper/hair/god', 'からだ (karada) - body']
     },
     'き': {
-        'origin': 'Derived from cursive 幾 (ki, "how many")',
-        'usage': 'Used in many common words and verb stems.',
-        'notes': 'The /k/ sound before /i/ is slightly palatalized.',
-        'words': ['木 (き, ki) - tree', '聞く (きく, kiku) - to listen']
+        'origin': 'Derived from cursive 幾 (ki, "how many"). The kanji relates to counting and quantity.',
+        'usage': 'Used in many common words and verb stems. The verb 来る (kuru, "to come") uses き in conjugation: 来ます (kimasu). Essential counter suffix: 木 (ki) for trees. Appears in directional words.',
+        'notes': 'The /k/ sound before /i/ is slightly palatalized (softer than "key"). Three strokes. Memory tip: Looks like a KEY. Critical for verbs of motion and coming/going.',
+        'words': ['木 (き, ki) - tree/wood', '聞く (きく, kiku) - to listen', 'きれい (kirei) - pretty/clean', 'きた (kita) - north', 'きのう (kinou) - yesterday', 'きもの (kimono) - kimono']
     },
     'く': {
-        'origin': 'Derived from cursive 久 (ku, "long time")',
+        'origin': 'Derived from cursive 久 (ku, "long time"). The character originally represented duration.',
+        'usage': 'Verb ending -ku conjugation: 大きく (ookiku, "in a big way"). Adverb form for i-adjectives. Common verb 来る (kuru, "come") uses this sound. Direction: 北 (kita, north) contains く sound.',
+        'notes': 'Simple shape - one stroke. Memory tip: Looks like a less-than sign "<". Essential for adverb formation from adjectives. RULE: い adjectives → く for adverb.',
+        'words': ['口 (くち, kuchi) - mouth', '靴 (くつ, kutsu) - shoes', 'くに (kuni) - country', 'くる (kuru) - to come', 'くろい (kuroi) - black', 'くすり (kusuri) - medicine']
+    },
+    'け': {
+        'origin': 'Derived from cursive 計 (kei, "measure/count"). Related to calculation and planning.',
+        'usage': 'Imperative form ending for verbs. Common in casual commands. Appears in question words and exclamations. Used in だけ (dake, "only") - important limiting particle.',
+        'notes': 'Three strokes forming distinctive shape. Memory tip: Looks like someone kicking (ke-kick). Important for casual/masculine speech patterns.',
+        'words': ['毛 (け, ke) - hair/fur', 'けっこう (kekkou) - quite/fine', 'けさ (kesa) - this morning', 'けしゴム (keshigomu) - eraser', 'けっか (kekka) - result']
+    },
+    'こ': {
+        'origin': 'Derived from cursive 己 (ko, "self"). The kanji represents oneself or one\'s own.',
+        'usage': 'Demonstrative pronoun これ (kore, "this"). Child: 子 (ko). Small: 小さい (chiisai) uses こ sound. Essential for pointing and demonstrating objects near speaker.',
+        'notes': 'Two simple strokes. Memory tip: Looks like two lines, represents "this" (close to speaker). RULE: これ (this), それ (that), あれ (that over there) pattern.',
+        'words': ['子 (こ, ko) - child', 'ここ (koko) - here', 'これ (kore) - this', 'こえ (koe) - voice', 'こころ (kokoro) - heart', 'こたえ (kotae) - answer']
+    },
         'usage': 'Common verb ending form in dictionary form.',
         'notes': 'Many verbs end with く (ku).',
         'words': ['薬 (くすり, kusuri) - medicine', '靴 (くつ, kutsu) - shoes']
