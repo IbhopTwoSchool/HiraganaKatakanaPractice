@@ -227,23 +227,8 @@ class HiraganaPracticeApp:
             print("   The font doesn't support Japanese characters.")
             print("\n🔧 FIX: Install Japanese fonts for your system")
         
-        # Check if emoji support is available using the dedicated emoji font
-        test_emoji = self.emoji_small_font.render("📚", True, (0, 0, 0))
-        has_emoji = test_emoji.get_width() > 10  # If width is small, emoji not supported
-        
-        if not has_emoji:
-            print("⚠️  Emoji font not detected. Using text labels instead.")
-            print("💡 To enable emojis:")
-            if platform.system() == "Windows":
-                print("   - Windows 10/11 includes Segoe UI Emoji by default")
-                print("   - If missing, update Windows or install a font pack")
-            elif platform.system() == "Linux":
-                print("   - Install: sudo apt install fonts-noto-color-emoji")
-                print("   - Or: sudo pacman -S noto-fonts-emoji (Arch)")
-            else:  # macOS
-                print("   - macOS includes Apple Color Emoji by default")
-        
-        self.has_emoji_support = has_emoji
+        # Disable emoji support - use text labels only
+        self.has_emoji_support = False
     
     def get_icon(self, emoji, fallback):
         """Get emoji if supported, otherwise return fallback text."""
