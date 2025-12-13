@@ -244,6 +244,24 @@ class HiraganaPracticeApp:
         """Get emoji if supported, otherwise return fallback text."""
         return emoji if self.has_emoji_support else fallback
     
+    def render_text_with_emoji(self, emoji, fallback_text, text, font, color):
+        """Render emoji and text as separate surfaces if emoji is supported, then combine."""
+        if self.has_emoji_support:
+            # Render emoji with emoji font and text with regular font
+            emoji_surface = self.emoji_font.render(emoji + " ", True, color)
+            text_surface = font.render(text, True, color)
+            
+            # Create combined surface
+            total_width = emoji_surface.get_width() + text_surface.get_width()
+            max_height = max(emoji_surface.get_height(), text_surface.get_height())
+            combined = pygame.Surface((total_width, max_height), pygame.SRCALPHA)
+            combined.blit(emoji_surface, (0, 0))
+            combined.blit(text_surface, (emoji_surface.get_width(), 0))
+            return combined
+        else:
+            # Fallback to text-only rendering
+            return font.render(f"{fallback_text} {text}", True, color)
+    
     def create_buttons(self):
         """Create button objects with positions and actions."""
         buttons = []
@@ -313,6 +331,24 @@ class HiraganaPracticeApp:
         text_font = self.small_font
         word_font = self.small_font
         
+        # Helper function to render emoji + text separately when emoji is supported
+        def render_label_with_emoji(emoji, fallback_text, label_text, font):
+            """Render emoji and text as separate surfaces if emoji is supported."""
+            if self.has_emoji_support:
+                # Render emoji with emoji font and text with regular font
+                emoji_surface = self.emoji_font.render(emoji + " ", True, DARK_GRAY)
+                text_surface = font.render(label_text, True, DARK_GRAY)
+                
+                # Create combined surface
+                total_width = emoji_surface.get_width() + text_surface.get_width()
+                combined = pygame.Surface((total_width, max(emoji_surface.get_height(), text_surface.get_height())), pygame.SRCALPHA)
+                combined.blit(emoji_surface, (0, 0))
+                combined.blit(text_surface, (emoji_surface.get_width(), 0))
+                return combined
+            else:
+                # Fallback to text-only rendering
+                return font.render(f"{fallback_text} {label_text}", True, DARK_GRAY)
+        
         # Helper function to wrap and draw text
         def draw_multiline_text(text, y_pos, font, color, label=None):
             if label:
@@ -345,22 +381,27 @@ class HiraganaPracticeApp:
             return y_pos + int(8 * self.scale_factor)
         
         # Draw origin
-        origin_label = self.get_icon("📜", "[Origin]") + " Origin:"
-        current_y = draw_multiline_text(info['origin'], current_y, text_font, (80, 80, 80), origin_label)
+        origin_label_surface = render_label_with_emoji("📜", "[Origin]", "Origin:", label_font)
+        self.screen.blit(origin_label_surface, (panel_x + padding, current_y))
+        current_y += int(22 * self.scale_factor)
+        current_y = draw_multiline_text(info['origin'], current_y, text_font, (80, 80, 80))
         
         # Draw usage
-        usage_label = self.get_icon("💡", "[Usage]") + " Usage:"
-        current_y = draw_multiline_text(info['usage'], current_y, text_font, (60, 60, 60), usage_label)
+        usage_label_surface = render_label_with_emoji("💡", "[Usage]", "Usage:", label_font)
+        self.screen.blit(usage_label_surface, (panel_x + padding, current_y))
+        current_y += int(22 * self.scale_factor)
+        current_y = draw_multiline_text(info['usage'], current_y, text_font, (60, 60, 60))
         
         # Draw notes
-        notes_label = self.get_icon("📌", "[Note]") + " Note:"
-        current_y = draw_multiline_text(info['notes'], current_y, text_font, (40, 40, 100), notes_label)
+        notes_label_surface = render_label_with_emoji("📌", "[Note]", "Note:", label_font)
+        self.screen.blit(notes_label_surface, (panel_x + padding, current_y))
+        current_y += int(22 * self.scale_factor)
+        current_y = draw_multiline_text(info['notes'], current_y, text_font, (40, 40, 100))
         
         # Draw common words
         current_y += int(5 * self.scale_factor)
-        words_label_text = self.get_icon("📚", "[Words]") + " Common Words:"
-        words_label = label_font.render(words_label_text, True, DARK_GRAY)
-        self.screen.blit(words_label, (panel_x + padding, current_y))
+        words_label_surface = render_label_with_emoji("📚", "[Words]", "Common Words:", label_font)
+        self.screen.blit(words_label_surface, (panel_x + padding, current_y))
         current_y += int(22 * self.scale_factor)
         
         for word in info['words']:
@@ -874,15 +915,11 @@ class HiraganaPracticeApp:
         self.screen.blit(mode_surface, (margin, margin))
         
         # Draw pen status
-        pen_icon = self.get_icon("✏️", "[PEN]")
         if self.pen_touching:
-            pen_status = f"{pen_icon} Drawing (Pressure: {self.pen_pressure:.0%})"
-            pen_color = GREEN
+            pen_surface = self.render_text_with_emoji("✏️", "[PEN]", f"Drawing (Pressure: {self.pen_pressure:.0%})", self.small_font, GREEN)
         else:
-            pen_status = f"{pen_icon} Pen Ready"
-            pen_color = BLUE
+            pen_surface = self.render_text_with_emoji("✏️", "[PEN]", "Pen Ready", self.small_font, BLUE)
         
-        pen_surface = self.small_font.render(pen_status, True, pen_color)
         self.screen.blit(pen_surface, (self.window_width - margin - pen_surface.get_width(), margin))
         
         # Draw character info with stroke progress
@@ -899,31 +936,21 @@ class HiraganaPracticeApp:
         tts_status_y = self.window_height - int(60 * self.scale_factor)
         if not self.tts_enabled:
             # TTS disabled
-            icon = self.get_icon("🔇", "[MUTE]")
-            status_text = f"{icon} TTS Disabled (Press M to enable)"
-            status_color = DARK_GRAY
+            status_surface = self.render_text_with_emoji("🔇", "[MUTE]", "TTS Disabled (Press M to enable)", self.keybind_font, DARK_GRAY)
         elif self.tts_failed:
             # TTS failed
-            icon = self.get_icon("❌", "[X]")
-            status_text = f"{icon} TTS Failed (Press R to reset, M to disable)"
-            status_color = RED
+            status_surface = self.render_text_with_emoji("❌", "[X]", "TTS Failed (Press R to reset, M to disable)", self.keybind_font, RED)
         elif self.tts_error_count > 0:
             # TTS has errors but still working
-            icon = self.get_icon("⚠️", "[!]")
-            status_text = f"{icon} TTS Issues ({self.tts_error_count} errors)"
-            status_color = ORANGE
+            status_surface = self.render_text_with_emoji("⚠️", "[!]", f"TTS Issues ({self.tts_error_count} errors)", self.keybind_font, ORANGE)
         else:
             # TTS working normally - show time since last success
             time_since = int(time.time() - self.tts_last_success)
-            icon = self.get_icon("🔊", "[SOUND]")
             if time_since < 60:
-                status_text = f"{icon} TTS Active"
-                status_color = GREEN
+                status_surface = self.render_text_with_emoji("🔊", "[SOUND]", "TTS Active", self.keybind_font, GREEN)
             else:
-                status_text = f"{icon} TTS Active ({time_since//60}m since last use)"
-                status_color = DARK_GRAY
+                status_surface = self.render_text_with_emoji("🔊", "[SOUND]", f"TTS Active ({time_since//60}m since last use)", self.keybind_font, DARK_GRAY)
         
-        status_surface = self.keybind_font.render(status_text, True, status_color)
         status_rect = status_surface.get_rect(center=(self.window_width // 2, tts_status_y))
         self.screen.blit(status_surface, status_rect)
         
