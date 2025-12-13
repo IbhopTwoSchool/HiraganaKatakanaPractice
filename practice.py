@@ -180,6 +180,9 @@ class HiraganaPracticeApp:
         self.keybind_font = pygame.font.SysFont(ui_fonts, int(14 * self.scale_factor))
         self.guide_font = pygame.font.SysFont(ui_fonts, int(20 * self.scale_factor))
         
+        # Create a properly-sized Japanese font for info panel title
+        self.title_char_font = pygame.font.SysFont(japanese_fonts, int(32 * self.scale_factor))
+        
         # Check if emoji support is available
         test_emoji = self.small_font.render("📚", True, (0, 0, 0))
         has_emoji = test_emoji.get_width() > 10  # If width is small, emoji not supported
@@ -257,16 +260,11 @@ class HiraganaPracticeApp:
         current_y = panel_y + padding
         text_width = panel_width - (padding * 2)
         
-        # Title - use char_font for the Japanese character, ui_font for English text
-        title_char_surface = self.char_font.render(char, True, BLUE)
-        # Scale down the character for the title
-        char_height = int(40 * self.scale_factor)
-        char_width = int(char_height * (title_char_surface.get_width() / title_char_surface.get_height()))
-        title_char_surface = pygame.transform.smoothscale(title_char_surface, (char_width, char_height))
-        
+        # Title - render "About" and Japanese character separately with proper fonts
         title_text_surface = self.ui_font.render("About ", True, BLUE)
+        title_char_surface = self.title_char_font.render(char, True, BLUE)
         
-        # Draw "About" then the character
+        # Draw "About" then the character side by side
         self.screen.blit(title_text_surface, (panel_x + padding, current_y))
         self.screen.blit(title_char_surface, (panel_x + padding + title_text_surface.get_width(), current_y))
         current_y += int(45 * self.scale_factor)
