@@ -257,11 +257,19 @@ class HiraganaPracticeApp:
         current_y = panel_y + padding
         text_width = panel_width - (padding * 2)
         
-        # Title
-        title_text = f"About {char}"
-        title_surface = self.ui_font.render(title_text, True, BLUE)
-        self.screen.blit(title_surface, (panel_x + padding, current_y))
-        current_y += int(40 * self.scale_factor)
+        # Title - use char_font for the Japanese character, ui_font for English text
+        title_char_surface = self.char_font.render(char, True, BLUE)
+        # Scale down the character for the title
+        char_height = int(40 * self.scale_factor)
+        char_width = int(char_height * (title_char_surface.get_width() / title_char_surface.get_height()))
+        title_char_surface = pygame.transform.smoothscale(title_char_surface, (char_width, char_height))
+        
+        title_text_surface = self.ui_font.render("About ", True, BLUE)
+        
+        # Draw "About" then the character
+        self.screen.blit(title_text_surface, (panel_x + padding, current_y))
+        self.screen.blit(title_char_surface, (panel_x + padding + title_text_surface.get_width(), current_y))
+        current_y += int(45 * self.scale_factor)
         
         # Use the class fonts which have emoji support
         label_font = self.small_font
