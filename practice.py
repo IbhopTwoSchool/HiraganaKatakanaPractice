@@ -122,21 +122,8 @@ class HiraganaPracticeApp:
     
     def calculate_layout(self):
         """Calculate layout dimensions based on current window size."""
-        # Calculate scaling factors with more conservative scaling for smaller screens
-        # Use a logarithmic-like curve to prevent fonts from being too large on small screens
-        base_scale = min(self.window_width / 1024, self.window_height / 768)
-        
-        # Apply dampening for smaller screens - less aggressive scaling
-        # For screens smaller than base reference (1024x768), reduce scaling impact
-        if base_scale < 1.0:
-            # Screens smaller than reference: scale more conservatively
-            self.scale_factor = 0.7 + (base_scale * 0.3)  # Min 0.7, max approaches 1.0
-        elif base_scale <= 2.0:
-            # Screens 1-2x reference: moderate scaling
-            self.scale_factor = 0.85 + (base_scale - 1.0) * 0.35  # 0.85 at 1x, 1.2 at 2x
-        else:
-            # Very large screens: allow more scaling but capped
-            self.scale_factor = 1.2 + (base_scale - 2.0) * 0.2  # Slower growth beyond 2x
+        # Calculate scaling factors - simple linear scaling works best
+        self.scale_factor = min(self.window_width / 1024, self.window_height / 768)
         
         # Button dimensions (scaled and flexible)
         self.button_height = int(70 * self.scale_factor)
@@ -209,23 +196,24 @@ class HiraganaPracticeApp:
         
         # Use SysFont with explicit font priority for best compatibility and scaling
         # SysFont handles font metrics and alignment better than direct Font() loading
-        self.char_font = pygame.font.SysFont(japanese_fonts, int(250 * self.scale_factor))
-        self.title_char_font = pygame.font.SysFont(japanese_fonts, int(32 * self.scale_factor))
+        # Reduced base sizes for better proportions on all screen sizes
+        self.char_font = pygame.font.SysFont(japanese_fonts, int(180 * self.scale_factor))
+        self.title_char_font = pygame.font.SysFont(japanese_fonts, int(24 * self.scale_factor))
         
         # Use ONLY Japanese fonts for text rendering (no emoji fonts mixed in)
         # This prevents emoji fonts from breaking regular text rendering
-        self.ui_font = pygame.font.SysFont(japanese_fonts, int(32 * self.scale_factor))
-        self.small_font = pygame.font.SysFont(japanese_fonts, int(24 * self.scale_factor))
-        self.button_font = pygame.font.SysFont(japanese_fonts, int(22 * self.scale_factor))
-        self.keybind_font = pygame.font.SysFont(japanese_fonts, int(14 * self.scale_factor))
-        self.guide_font = pygame.font.SysFont(japanese_fonts, int(20 * self.scale_factor))
+        self.ui_font = pygame.font.SysFont(japanese_fonts, int(24 * self.scale_factor))
+        self.small_font = pygame.font.SysFont(japanese_fonts, int(18 * self.scale_factor))
+        self.button_font = pygame.font.SysFont(japanese_fonts, int(16 * self.scale_factor))
+        self.keybind_font = pygame.font.SysFont(japanese_fonts, int(12 * self.scale_factor))
+        self.guide_font = pygame.font.SysFont(japanese_fonts, int(15 * self.scale_factor))
         
         # Create emoji fonts matching each text font size for proper scaling
-        self.emoji_ui_font = pygame.font.SysFont(emoji_fonts, int(32 * self.scale_factor))
-        self.emoji_small_font = pygame.font.SysFont(emoji_fonts, int(24 * self.scale_factor))
-        self.emoji_button_font = pygame.font.SysFont(emoji_fonts, int(22 * self.scale_factor))
-        self.emoji_keybind_font = pygame.font.SysFont(emoji_fonts, int(14 * self.scale_factor))
-        self.emoji_guide_font = pygame.font.SysFont(emoji_fonts, int(20 * self.scale_factor))
+        self.emoji_ui_font = pygame.font.SysFont(emoji_fonts, int(24 * self.scale_factor))
+        self.emoji_small_font = pygame.font.SysFont(emoji_fonts, int(18 * self.scale_factor))
+        self.emoji_button_font = pygame.font.SysFont(emoji_fonts, int(16 * self.scale_factor))
+        self.emoji_keybind_font = pygame.font.SysFont(emoji_fonts, int(12 * self.scale_factor))
+        self.emoji_guide_font = pygame.font.SysFont(emoji_fonts, int(15 * self.scale_factor))
         
         print(f"✓ Loaded all fonts using SysFont with scale factor: {self.scale_factor}")
         
