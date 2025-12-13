@@ -155,12 +155,52 @@ class HiraganaPracticeApp:
             'dejavusans',     # DejaVu Sans (fallback)
             'liberationsans', # Liberation Sans (fallback)
         ]
+        
+        # Emoji fonts (for UI elements with emojis)
+        emoji_fonts = [
+            'segoeuiemoji',     # Windows 10/11 emoji font
+            'applesymbol',      # macOS emoji
+            'notocoloremoji',   # Linux/Android emoji
+            'notoemoji',        # Noto Emoji (monochrome)
+            'symbola',          # Symbola font (good Unicode coverage)
+            'dejavusans',       # DejaVu has some symbols
+        ]
+        
+        # Fallback UI fonts that have good Unicode coverage
+        ui_fonts = [
+            'segoeuisymbol',    # Windows symbol font
+            'arial',            # Common fallback
+            'segoeuiemoji',     # Include emoji support
+        ] + japanese_fonts
+        
         self.char_font = pygame.font.SysFont(japanese_fonts, int(250 * self.scale_factor))
-        self.ui_font = pygame.font.SysFont(japanese_fonts, int(32 * self.scale_factor))
-        self.small_font = pygame.font.SysFont(japanese_fonts, int(24 * self.scale_factor))
-        self.button_font = pygame.font.SysFont(japanese_fonts, int(22 * self.scale_factor))
-        self.keybind_font = pygame.font.SysFont(japanese_fonts, int(14 * self.scale_factor))
-        self.guide_font = pygame.font.SysFont(japanese_fonts, int(20 * self.scale_factor))
+        self.ui_font = pygame.font.SysFont(ui_fonts, int(32 * self.scale_factor))
+        self.small_font = pygame.font.SysFont(ui_fonts, int(24 * self.scale_factor))
+        self.button_font = pygame.font.SysFont(ui_fonts, int(22 * self.scale_factor))
+        self.keybind_font = pygame.font.SysFont(ui_fonts, int(14 * self.scale_factor))
+        self.guide_font = pygame.font.SysFont(ui_fonts, int(20 * self.scale_factor))
+        
+        # Check if emoji support is available
+        test_emoji = self.small_font.render("📚", True, (0, 0, 0))
+        has_emoji = test_emoji.get_width() > 10  # If width is small, emoji not supported
+        
+        if not has_emoji:
+            print("⚠️  Emoji font not detected. Using text labels instead.")
+            print("💡 To enable emojis:")
+            if platform.system() == "Windows":
+                print("   - Windows 10/11 includes Segoe UI Emoji by default")
+                print("   - If missing, update Windows or install a font pack")
+            elif platform.system() == "Linux":
+                print("   - Install: sudo apt install fonts-noto-color-emoji")
+                print("   - Or: sudo pacman -S noto-fonts-emoji (Arch)")
+            else:  # macOS
+                print("   - macOS includes Apple Color Emoji by default")
+        
+        self.has_emoji_support = has_emoji
+    
+    def get_icon(self, emoji, fallback):
+        """Get emoji if supported, otherwise return fallback text."""
+        return emoji if self.has_emoji_support else fallback
     
     def create_buttons(self):
         """Create button objects with positions and actions."""
@@ -260,17 +300,21 @@ class HiraganaPracticeApp:
             return y_pos + int(8 * self.scale_factor)
         
         # Draw origin
-        current_y = draw_multiline_text(info['origin'], current_y, small_font, (80, 80, 80), "📜 Origin:")
+        origin_label = self.get_icon("📜", "[Origin]") + " Origin:"
+        current_y = draw_multiline_text(info['origin'], current_y, small_font, (80, 80, 80), origin_label)
         
         # Draw usage
-        current_y = draw_multiline_text(info['usage'], current_y, small_font, (60, 60, 60), "💡 Usage:")
+        usage_label = self.get_icon("💡", "[Usage]") + " Usage:"
+        current_y = draw_multiline_text(info['usage'], current_y, small_font, (60, 60, 60), usage_label)
         
         # Draw notes
-        current_y = draw_multiline_text(info['notes'], current_y, small_font, (40, 40, 100), "📌 Note:")
+        notes_label = self.get_icon("📌", "[Note]") + " Note:"
+        current_y = draw_multiline_text(info['notes'], current_y, small_font, (40, 40, 100), notes_label)
         
         # Draw common words
         current_y += int(5 * self.scale_factor)
-        words_label = small_font.render("📚 Common Words:", True, DARK_GRAY)
+        words_label_text = self.get_icon("📚", "[Words]") + " Common Words:"
+        words_label = small_font.render(words_label_text, True, DARK_GRAY)
         self.screen.blit(words_label, (panel_x + padding, current_y))
         current_y += int(22 * self.scale_factor)
         
@@ -799,11 +843,12 @@ class HiraganaPracticeApp:
         self.screen.blit(mode_surface, (margin, margin))
         
         # Draw pen status
+        pen_icon = self.get_icon("✏️", "[PEN]")
         if self.pen_touching:
-            pen_status = f"✏️ Drawing (Pressure: {self.pen_pressure:.0%})"
+            pen_status = f"{pen_icon} Drawing (Pressure: {self.pen_pressure:.0%})"
             pen_color = GREEN
         else:
-            pen_status = "✏️ Pen Ready"
+            pen_status = f"{pen_icon} Pen Ready"
             pen_color = BLUE
         
         pen_surface = self.small_font.render(pen_status, True, pen_color)
@@ -823,52 +868,28 @@ class HiraganaPracticeApp:
         tts_status_y = self.window_height - int(60 * self.scale_factor)
         if not self.tts_enabled:
             # TTS disabled
-            status_text = "🔇 TTS Disabled (Press M to enable)"
+            icon = self.get_icon("🔇", "[MUTE]")
+            status_text = f"{icon} TTS Disabled (Press M to enable)"
             status_color = DARK_GRAY
         elif self.tts_failed:
             # TTS failed
-            status_text = f"❌ TTS Failed (Press R to reset, M to disable)"
+            icon = self.get_icon("❌", "[X]")
+            status_text = f"{icon} TTS Failed (Press R to reset, M to disable)"
             status_color = RED
         elif self.tts_error_count > 0:
             # TTS has errors but still working
-            status_text = f"⚠️ TTS Issues ({self.tts_error_count} errors)"
+            icon = self.get_icon("⚠️", "[!]")
+            status_text = f"{icon} TTS Issues ({self.tts_error_count} errors)"
             status_color = ORANGE
         else:
             # TTS working normally - show time since last success
             time_since = int(time.time() - self.tts_last_success)
+            icon = self.get_icon("🔊", "[SOUND]")
             if time_since < 60:
-                status_text = f"🔊 TTS Active"
+                status_text = f"{icon} TTS Active"
                 status_color = GREEN
             else:
-                status_text = f"🔊 TTS Active ({time_since//60}m since last use)"
-                status_color = DARK_GRAY
-        
-        status_surface = self.keybind_font.render(status_text, True, status_color)
-        status_rect = status_surface.get_rect(center=(self.window_width // 2, tts_status_y))
-        self.screen.blit(status_surface, status_rect)
-        
-        # Draw TTS status indicator
-        tts_status_y = self.window_height - int(60 * self.scale_factor)
-        if not self.tts_enabled:
-            # TTS disabled
-            status_text = "🔇 TTS Disabled (Press T to enable)"
-            status_color = DARK_GRAY
-        elif self.tts_failed:
-            # TTS failed
-            status_text = f"❌ TTS Failed (Press R to reset, T to disable)"
-            status_color = RED
-        elif self.tts_error_count > 0:
-            # TTS has errors but still working
-            status_text = f"⚠️ TTS Issues ({self.tts_error_count} errors)"
-            status_color = ORANGE
-        else:
-            # TTS working normally - show time since last success
-            time_since = int(time.time() - self.tts_last_success)
-            if time_since < 60:
-                status_text = f"🔊 TTS Active"
-                status_color = GREEN
-            else:
-                status_text = f"🔊 TTS Active ({time_since//60}m since last use)"
+                status_text = f"{icon} TTS Active ({time_since//60}m since last use)"
                 status_color = DARK_GRAY
         
         status_surface = self.keybind_font.render(status_text, True, status_color)

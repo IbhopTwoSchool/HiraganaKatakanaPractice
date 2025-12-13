@@ -20,7 +20,8 @@ A program that allows you to write and trace katakana and hiragana characters fo
 - gTTS 2.3.0+ (for text-to-speech)
 - numpy 1.24.0+ (for audio effects)
 - **Active Stylus/Pen** - This application requires a pressure-sensitive stylus
-- **Japanese Fonts** - Run `install_fonts.py` to check/install required fonts
+- **Japanese Fonts** - See [FONT_SETUP.md](FONT_SETUP.md) for detailed installation instructions
+- **Emoji Fonts** (optional) - For displaying UI icons; fallback text labels are used if unavailable
 - Touch screen device with pen/stylus support (Lenovo ThinkPad Y1 Yoga recommended)
 
 ## Installation
@@ -34,6 +35,18 @@ sudo pacman -S python python-pip
 
 # Install dependencies
 pip install -r requirements.txt
+
+# Install fonts (Japanese + Emoji support)
+sudo pacman -S noto-fonts-cjk noto-fonts-emoji
+```
+
+#### Ubuntu/Debian
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Install fonts (Japanese + Emoji support)
+sudo apt install fonts-noto-cjk fonts-noto-color-emoji
 ```
 
 #### Windows
@@ -41,9 +54,16 @@ pip install -r requirements.txt
 # Install Python from python.org if not already installed
 # Then install dependencies:
 pip install -r requirements.txt
+
+# Fonts: Windows 10/11 includes required fonts by default
+# If you see empty boxes, see FONT_SETUP.md for troubleshooting
 ```
 
-### Step 2: Check Japanese Fonts
+### Step 2: Verify Font Installation
+
+**The program automatically detects font support** on startup. If you see warnings about missing emoji fonts:
+- See [FONT_SETUP.md](FONT_SETUP.md) for detailed installation instructions
+- The program works perfectly with text fallbacks if emoji fonts are unavailable
 
 Run the font checker to ensure you have Japanese character support:
 ```bash
