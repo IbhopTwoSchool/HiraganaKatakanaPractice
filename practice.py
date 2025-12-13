@@ -258,15 +258,15 @@ class HiraganaPracticeApp:
         text_width = panel_width - (padding * 2)
         
         # Title
-        title_font = pygame.font.Font(None, int(32 * self.scale_factor))
         title_text = f"About {char}"
-        title_surface = title_font.render(title_text, True, BLUE)
+        title_surface = self.ui_font.render(title_text, True, BLUE)
         self.screen.blit(title_surface, (panel_x + padding, current_y))
         current_y += int(40 * self.scale_factor)
         
-        # Info font
-        info_font = pygame.font.Font(None, int(18 * self.scale_factor))
-        small_font = pygame.font.Font(None, int(16 * self.scale_factor))
+        # Use the class fonts which have emoji support
+        label_font = self.small_font
+        text_font = self.small_font
+        word_font = self.small_font
         
         # Helper function to wrap and draw text
         def draw_multiline_text(text, y_pos, font, color, label=None):
@@ -301,24 +301,23 @@ class HiraganaPracticeApp:
         
         # Draw origin
         origin_label = self.get_icon("📜", "[Origin]") + " Origin:"
-        current_y = draw_multiline_text(info['origin'], current_y, small_font, (80, 80, 80), origin_label)
+        current_y = draw_multiline_text(info['origin'], current_y, text_font, (80, 80, 80), origin_label)
         
         # Draw usage
         usage_label = self.get_icon("💡", "[Usage]") + " Usage:"
-        current_y = draw_multiline_text(info['usage'], current_y, small_font, (60, 60, 60), usage_label)
+        current_y = draw_multiline_text(info['usage'], current_y, text_font, (60, 60, 60), usage_label)
         
         # Draw notes
         notes_label = self.get_icon("📌", "[Note]") + " Note:"
-        current_y = draw_multiline_text(info['notes'], current_y, small_font, (40, 40, 100), notes_label)
+        current_y = draw_multiline_text(info['notes'], current_y, text_font, (40, 40, 100), notes_label)
         
         # Draw common words
         current_y += int(5 * self.scale_factor)
         words_label_text = self.get_icon("📚", "[Words]") + " Common Words:"
-        words_label = small_font.render(words_label_text, True, DARK_GRAY)
+        words_label = label_font.render(words_label_text, True, DARK_GRAY)
         self.screen.blit(words_label, (panel_x + padding, current_y))
         current_y += int(22 * self.scale_factor)
         
-        word_font = pygame.font.Font(None, int(15 * self.scale_factor))
         for word in info['words']:
             if current_y + int(20 * self.scale_factor) > panel_y + panel_height - padding:
                 break  # Don't overflow panel
