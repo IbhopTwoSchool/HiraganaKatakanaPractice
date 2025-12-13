@@ -164,22 +164,6 @@ CHARACTER_INFO = {
         'notes': 'Two simple strokes. Memory tip: Looks like two lines, represents "this" (close to speaker). RULE: これ (this), それ (that), あれ (that over there) pattern.',
         'words': ['子 (こ, ko) - child', 'ここ (koko) - here', 'これ (kore) - this', 'こえ (koe) - voice', 'こころ (kokoro) - heart', 'こたえ (kotae) - answer']
     },
-        'usage': 'Common verb ending form in dictionary form.',
-        'notes': 'Many verbs end with く (ku).',
-        'words': ['薬 (くすり, kusuri) - medicine', '靴 (くつ, kutsu) - shoes']
-    },
-    'け': {
-        'origin': 'Derived from cursive 計 (kei, "measure")',
-        'usage': 'Used in potential form and negative imperatives.',
-        'notes': 'Less frequent than other kana but important.',
-        'words': ['毛 (け, ke) - hair', '景色 (けしき, keshiki) - scenery']
-    },
-    'こ': {
-        'origin': 'Derived from cursive 己 (ko, "self")',
-        'usage': 'Demonstrative これ (kore) means "this".',
-        'notes': 'こ、そ、あ、ど pattern for demonstratives.',
-        'words': ['子供 (こども, kodomo) - child', 'ここ (koko) - here']
-    },
     
     # S-row hiragana
     'さ': {
