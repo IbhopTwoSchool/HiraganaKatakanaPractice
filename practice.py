@@ -122,8 +122,21 @@ class HiraganaPracticeApp:
     
     def calculate_layout(self):
         """Calculate layout dimensions based on current window size."""
-        # Calculate scaling factors
-        self.scale_factor = min(self.window_width / 1024, self.window_height / 768)
+        # Calculate scaling factors with more conservative scaling for smaller screens
+        # Use a logarithmic-like curve to prevent fonts from being too large on small screens
+        base_scale = min(self.window_width / 1024, self.window_height / 768)
+        
+        # Apply dampening for smaller screens - less aggressive scaling
+        # For screens smaller than base reference (1024x768), reduce scaling impact
+        if base_scale < 1.0:
+            # Screens smaller than reference: scale more conservatively
+            self.scale_factor = 0.7 + (base_scale * 0.3)  # Min 0.7, max approaches 1.0
+        elif base_scale <= 2.0:
+            # Screens 1-2x reference: moderate scaling
+            self.scale_factor = 0.85 + (base_scale - 1.0) * 0.35  # 0.85 at 1x, 1.2 at 2x
+        else:
+            # Very large screens: allow more scaling but capped
+            self.scale_factor = 1.2 + (base_scale - 2.0) * 0.2  # Slower growth beyond 2x
         
         # Button dimensions (scaled and flexible)
         self.button_height = int(70 * self.scale_factor)
