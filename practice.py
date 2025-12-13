@@ -199,14 +199,16 @@ class HiraganaPracticeApp:
         self.char_font = pygame.font.SysFont(japanese_fonts, int(250 * self.scale_factor))
         self.title_char_font = pygame.font.SysFont(japanese_fonts, int(32 * self.scale_factor))
         
-        # Use Japanese fonts for all UI text to ensure consistent Japanese character display
-        # Mix with emoji fonts for icon support
-        all_ui_fonts = ['msgothic', 'mspgothic'] + emoji_fonts + japanese_fonts
-        self.ui_font = pygame.font.SysFont(all_ui_fonts, int(32 * self.scale_factor))
-        self.small_font = pygame.font.SysFont(all_ui_fonts, int(24 * self.scale_factor))
-        self.button_font = pygame.font.SysFont(all_ui_fonts, int(22 * self.scale_factor))
-        self.keybind_font = pygame.font.SysFont(all_ui_fonts, int(14 * self.scale_factor))
-        self.guide_font = pygame.font.SysFont(all_ui_fonts, int(20 * self.scale_factor))
+        # Use ONLY Japanese fonts for text rendering (no emoji fonts mixed in)
+        # This prevents emoji fonts from breaking regular text rendering
+        self.ui_font = pygame.font.SysFont(japanese_fonts, int(32 * self.scale_factor))
+        self.small_font = pygame.font.SysFont(japanese_fonts, int(24 * self.scale_factor))
+        self.button_font = pygame.font.SysFont(japanese_fonts, int(22 * self.scale_factor))
+        self.keybind_font = pygame.font.SysFont(japanese_fonts, int(14 * self.scale_factor))
+        self.guide_font = pygame.font.SysFont(japanese_fonts, int(20 * self.scale_factor))
+        
+        # Create separate emoji font for emoji-only rendering
+        self.emoji_font = pygame.font.SysFont(emoji_fonts, int(24 * self.scale_factor))
         
         print(f"✓ Loaded all fonts using SysFont with scale factor: {self.scale_factor}")
         
@@ -220,8 +222,8 @@ class HiraganaPracticeApp:
             print("   The font doesn't support Japanese characters.")
             print("\n🔧 FIX: Install Japanese fonts for your system")
         
-        # Check if emoji support is available
-        test_emoji = self.small_font.render("📚", True, (0, 0, 0))
+        # Check if emoji support is available using the dedicated emoji font
+        test_emoji = self.emoji_font.render("📚", True, (0, 0, 0))
         has_emoji = test_emoji.get_width() > 10  # If width is small, emoji not supported
         
         if not has_emoji:
