@@ -138,27 +138,52 @@ class HiraganaPracticeApp:
     
     def update_fonts(self):
         """Update fonts based on current scale factor."""
-        # Try multiple font names (Windows and Linux)
+        # Get list of all available fonts for debugging
+        available_fonts = pygame.font.get_fonts()
+        
+        # Try multiple font names (Windows and Linux) with exact system names
         japanese_fonts = [
-            'notosanscjkjp',  # Noto Sans CJK JP (installed by install_fonts.py)
-            'notosansjp',
-            'notosanscjk',
-            'msgothic',       # MS Gothic (Windows)
-            'meiryo',         # Meiryo (Windows)
-            'mspgothic',      # MS PGothic (Windows)
-            'yugothic',       # Yu Gothic (Windows)
-            'msmincho',       # MS Mincho (Windows)
-            'takao',          # Takao fonts (Linux)
-            'vlgothic',       # VL Gothic (Linux)
-            'ipaexgothic',    # IPA fonts (Linux)
-            'ipagothic',
-            'dejavusans',     # DejaVu Sans (fallback)
-            'liberationsans', # Liberation Sans (fallback)
+            'msgothic',           # MS Gothic (Windows) - most common
+            'mspgothic',          # MS PGothic (Windows)
+            'meiryo',             # Meiryo (Windows)
+            'msmincho',           # MS Mincho (Windows)
+            'yugothic',           # Yu Gothic (Windows 8.1+)
+            'notosanscjkjp',      # Noto Sans CJK JP
+            'notosansjp',         # Noto Sans JP
+            'notosanscjk',        # Noto Sans CJK
+            'takao',              # Takao fonts (Linux)
+            'vlgothic',           # VL Gothic (Linux)
+            'ipaexgothic',        # IPA fonts (Linux)
+            'ipagothic',          # IPA Gothic (Linux)
+            'arialunicodems',     # Arial Unicode MS (broad fallback)
+            'dejavusans',         # DejaVu Sans (fallback)
+            'liberationsans',     # Liberation Sans (fallback)
         ]
+        
+        # Find which Japanese fonts are actually available
+        found_japanese = [f for f in japanese_fonts if f in available_fonts]
+        
+        if not found_japanese:
+            print("⚠️  WARNING: No Japanese fonts detected!")
+            print("Available fonts:", ", ".join(sorted(available_fonts)[:20]), "...")
+            print("\n💡 Installing fonts:")
+            if platform.system() == "Windows":
+                print("   Windows should have MS Gothic by default.")
+                print("   Check: C:\\Windows\\Fonts\\ for msgothic.ttc")
+                print("   If missing, update Windows or install manually.")
+            elif platform.system() == "Linux":
+                print("   Run: sudo apt install fonts-noto-cjk")
+                print("   Or: sudo pacman -S noto-fonts-cjk")
+            
+            # Use any available font as absolute fallback
+            japanese_fonts = ['arial', 'dejavusans', 'freesans', 'liberationsans']
+        else:
+            print(f"✓ Found Japanese fonts: {', '.join(found_japanese[:3])}")
         
         # Emoji fonts (for UI elements with emojis)
         emoji_fonts = [
             'segoeuiemoji',     # Windows 10/11 emoji font
+            'segoeuisymbol',    # Windows symbol font
             'applesymbol',      # macOS emoji
             'notocoloremoji',   # Linux/Android emoji
             'notoemoji',        # Noto Emoji (monochrome)
@@ -167,21 +192,62 @@ class HiraganaPracticeApp:
         ]
         
         # Fallback UI fonts that have good Unicode coverage
-        ui_fonts = [
-            'segoeuisymbol',    # Windows symbol font
-            'arial',            # Common fallback
-            'segoeuiemoji',     # Include emoji support
-        ] + japanese_fonts
+        ui_fonts = emoji_fonts + japanese_fonts
         
-        self.char_font = pygame.font.SysFont(japanese_fonts, int(250 * self.scale_factor))
-        self.ui_font = pygame.font.SysFont(ui_fonts, int(32 * self.scale_factor))
-        self.small_font = pygame.font.SysFont(ui_fonts, int(24 * self.scale_factor))
-        self.button_font = pygame.font.SysFont(ui_fonts, int(22 * self.scale_factor))
-        self.keybind_font = pygame.font.SysFont(ui_fonts, int(14 * self.scale_factor))
-        self.guide_font = pygame.font.SysFont(ui_fonts, int(20 * self.scale_factor))
+        # Try to load Japanese fonts with priority on MS Gothic (most reliable on Windows)
+        # Also try direct font file paths for Windows
+        import os
+        windows_font_paths = [
+            'C:\\Windows\\Fonts\\msgothic.ttc',
+            'C:\\Windows\\Fonts\\msmincho.ttc',
+            'C:\\Windows\\Fonts\\meiryo.ttc',
+            'C:\\Windows\\Fonts\\YuGothM.ttc',
+        ]
         
-        # Create a properly-sized Japanese font for info panel title
-        self.title_char_font = pygame.font.SysFont(japanese_fonts, int(32 * self.scale_factor))
+        # Try loading from font file first (most reliable)
+        font_file = None
+        if platform.system() == "Windows":
+            for font_path in windows_font_paths:
+                if os.path.exists(font_path):
+                    try:
+                        # Test if font loads
+                        test_font = pygame.font.Font(font_path, 32)
+                        font_file = font_path
+                        print(f"✓ Loaded Japanese font from: {font_path}")
+                        break
+                    except Exception as e:
+                        print(f"Failed to load {font_path}: {e}")
+                        continue
+        
+        # Load all fonts using the same font file for consistency
+        if font_file:
+            self.char_font = pygame.font.Font(font_file, int(250 * self.scale_factor))
+            self.title_char_font = pygame.font.Font(font_file, int(32 * self.scale_factor))
+            self.ui_font = pygame.font.Font(font_file, int(32 * self.scale_factor))
+            self.small_font = pygame.font.Font(font_file, int(24 * self.scale_factor))
+            self.button_font = pygame.font.Font(font_file, int(22 * self.scale_factor))
+            self.keybind_font = pygame.font.Font(font_file, int(14 * self.scale_factor))
+            self.guide_font = pygame.font.Font(font_file, int(20 * self.scale_factor))
+        else:
+            # Fallback to SysFont if direct file loading failed
+            self.char_font = pygame.font.SysFont(japanese_fonts, int(250 * self.scale_factor))
+            self.title_char_font = pygame.font.SysFont(japanese_fonts, int(32 * self.scale_factor))
+            self.ui_font = pygame.font.SysFont(ui_fonts, int(32 * self.scale_factor))
+            self.small_font = pygame.font.SysFont(ui_fonts, int(24 * self.scale_factor))
+            self.button_font = pygame.font.SysFont(ui_fonts, int(22 * self.scale_factor))
+            self.keybind_font = pygame.font.SysFont(ui_fonts, int(14 * self.scale_factor))
+            self.guide_font = pygame.font.SysFont(ui_fonts, int(20 * self.scale_factor))
+            print(f"✓ Loaded Japanese fonts using SysFont")
+        
+        # Test if Japanese characters actually render
+        test_char = self.char_font.render('あ', True, (0, 0, 0))
+        test_width = test_char.get_width()
+        print(f"🧪 Test character 'あ' rendered width: {test_width}px")
+        
+        if test_width < 10:
+            print("❌ CRITICAL: Japanese characters not rendering!")
+            print("   The font doesn't support Japanese characters.")
+            print("\n🔧 FIX: Install Japanese fonts for your system")
         
         # Check if emoji support is available
         test_emoji = self.small_font.render("📚", True, (0, 0, 0))
@@ -721,17 +787,6 @@ class HiraganaPracticeApp:
                     elif event.button in [4, 5, 9, 10]:
                         self.next_character()
                 elif event.button == 1:  # Pen tip
-                    # DEBUG: Show ALL event attributes
-                    print(f"\n🔍 MOUSEBUTTONDOWN EVENT DEBUG:")
-                    print(f"   All attributes: {dir(event)}")
-                    print(f"   Has 'pressure': {hasattr(event, 'pressure')}")
-                    if hasattr(event, 'pressure'):
-                        print(f"   event.pressure = {event.pressure}")
-                    if hasattr(event, 'touch'):
-                        print(f"   event.touch = {event.touch}")
-                    if hasattr(event, 'window'):
-                        print(f"   event.window = {event.window}")
-                    
                     if hasattr(event, 'pressure'):
                         raw_pressure = event.pressure
                         if raw_pressure > 1.0:
@@ -739,9 +794,7 @@ class HiraganaPracticeApp:
                         
                         # Much more aggressive curve - cube root for very gradual buildup
                         self.pen_pressure = pow(raw_pressure, 0.3)  # Was 0.7, now 0.3 for more sensitivity
-                        print(f"✏️  Pen down - Raw: {raw_pressure:.4f}, Adjusted: {self.pen_pressure:.4f}")
                     else:
-                        print(f"⚠️  NO PRESSURE ATTRIBUTE - Using default 0.5")
                         self.pen_pressure = 0.5  # Default to 50% instead of 100%
                     
                     self.pen_touching = True
