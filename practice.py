@@ -13,7 +13,7 @@ import os
 import time
 import platform
 from gtts import gTTS
-from characters import HIRAGANA_DATA, KATAKANA_DATA
+from characters import HIRAGANA_DATA, KATAKANA_DATA, CHARACTER_INFO, CHARACTER_INFO
 
 # Initialize pygame
 pygame.init()
@@ -193,6 +193,94 @@ class HiraganaPracticeApp:
             x_pos += self.button_width + self.button_margin
         
         return buttons
+    
+    def draw_character_info(self, char):
+        """Draw educational information panel for the current character."""
+        if char not in CHARACTER_INFO:
+            return
+        
+        info = CHARACTER_INFO[char]
+        panel_width = int(350 * self.scale_factor)
+        panel_x = self.window_width - panel_width - int(10 * self.scale_factor)
+        panel_y = int(60 * self.scale_factor)
+        panel_height = self.window_height - int(150 * self.scale_factor)
+        
+        # Draw semi-transparent background panel
+        panel_surface = pygame.Surface((panel_width, panel_height))
+        panel_surface.set_alpha(230)
+        panel_surface.fill((250, 250, 255))
+        pygame.draw.rect(panel_surface, BLUE, (0, 0, panel_width, panel_height), 3)
+        self.screen.blit(panel_surface, (panel_x, panel_y))
+        
+        # Prepare text rendering
+        padding = int(15 * self.scale_factor)
+        current_y = panel_y + padding
+        text_width = panel_width - (padding * 2)
+        
+        # Title
+        title_font = pygame.font.Font(None, int(32 * self.scale_factor))
+        title_text = f"About {char}"
+        title_surface = title_font.render(title_text, True, BLUE)
+        self.screen.blit(title_surface, (panel_x + padding, current_y))
+        current_y += int(40 * self.scale_factor)
+        
+        # Info font
+        info_font = pygame.font.Font(None, int(18 * self.scale_factor))
+        small_font = pygame.font.Font(None, int(16 * self.scale_factor))
+        
+        # Helper function to wrap and draw text
+        def draw_multiline_text(text, y_pos, font, color, label=None):
+            if label:
+                label_surface = font.render(label, True, DARK_GRAY)
+                self.screen.blit(label_surface, (panel_x + padding, y_pos))
+                y_pos += int(22 * self.scale_factor)
+            
+            words = text.split(' ')
+            lines = []
+            current_line = []
+            
+            for word in words:
+                test_line = ' '.join(current_line + [word])
+                test_surface = font.render(test_line, True, color)
+                if test_surface.get_width() <= text_width:
+                    current_line.append(word)
+                else:
+                    if current_line:
+                        lines.append(' '.join(current_line))
+                    current_line = [word]
+            
+            if current_line:
+                lines.append(' '.join(current_line))
+            
+            for line in lines:
+                line_surface = font.render(line, True, color)
+                self.screen.blit(line_surface, (panel_x + padding, y_pos))
+                y_pos += int(20 * self.scale_factor)
+            
+            return y_pos + int(8 * self.scale_factor)
+        
+        # Draw origin
+        current_y = draw_multiline_text(info['origin'], current_y, small_font, (80, 80, 80), "📜 Origin:")
+        
+        # Draw usage
+        current_y = draw_multiline_text(info['usage'], current_y, small_font, (60, 60, 60), "💡 Usage:")
+        
+        # Draw notes
+        current_y = draw_multiline_text(info['notes'], current_y, small_font, (40, 40, 100), "📌 Note:")
+        
+        # Draw common words
+        current_y += int(5 * self.scale_factor)
+        words_label = small_font.render("📚 Common Words:", True, DARK_GRAY)
+        self.screen.blit(words_label, (panel_x + padding, current_y))
+        current_y += int(22 * self.scale_factor)
+        
+        word_font = pygame.font.Font(None, int(15 * self.scale_factor))
+        for word in info['words']:
+            if current_y + int(20 * self.scale_factor) > panel_y + panel_height - padding:
+                break  # Don't overflow panel
+            word_surface = word_font.render(f"  • {word}", True, (50, 50, 50))
+            self.screen.blit(word_surface, (panel_x + padding, current_y))
+            current_y += int(18 * self.scale_factor)
     
     def draw_smooth_pressure_stroke(self, pos, pressure=0.0):
         """Draw a beautiful smooth pressure-sensitive stroke like a fine brush.
@@ -698,6 +786,9 @@ class HiraganaPracticeApp:
         
         # Draw user's drawing
         self.screen.blit(self.drawing_surface, (0, 0))
+        
+        # Draw educational info panel on the right side
+        self.draw_character_info(char)
         
         # Draw UI elements
         margin = int(15 * self.scale_factor)
