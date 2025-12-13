@@ -194,50 +194,21 @@ class HiraganaPracticeApp:
         # Fallback UI fonts that have good Unicode coverage
         ui_fonts = emoji_fonts + japanese_fonts
         
-        # Try to load Japanese fonts with priority on MS Gothic (most reliable on Windows)
-        # Also try direct font file paths for Windows
-        import os
-        windows_font_paths = [
-            'C:\\Windows\\Fonts\\msgothic.ttc',
-            'C:\\Windows\\Fonts\\msmincho.ttc',
-            'C:\\Windows\\Fonts\\meiryo.ttc',
-            'C:\\Windows\\Fonts\\YuGothM.ttc',
-        ]
+        # Use SysFont with explicit font priority for best compatibility and scaling
+        # SysFont handles font metrics and alignment better than direct Font() loading
+        self.char_font = pygame.font.SysFont(japanese_fonts, int(250 * self.scale_factor))
+        self.title_char_font = pygame.font.SysFont(japanese_fonts, int(32 * self.scale_factor))
         
-        # Try loading from font file first (most reliable)
-        font_file = None
-        if platform.system() == "Windows":
-            for font_path in windows_font_paths:
-                if os.path.exists(font_path):
-                    try:
-                        # Test if font loads
-                        test_font = pygame.font.Font(font_path, 32)
-                        font_file = font_path
-                        print(f"✓ Loaded Japanese font from: {font_path}")
-                        break
-                    except Exception as e:
-                        print(f"Failed to load {font_path}: {e}")
-                        continue
+        # Use Japanese fonts for all UI text to ensure consistent Japanese character display
+        # Mix with emoji fonts for icon support
+        all_ui_fonts = ['msgothic', 'mspgothic'] + emoji_fonts + japanese_fonts
+        self.ui_font = pygame.font.SysFont(all_ui_fonts, int(32 * self.scale_factor))
+        self.small_font = pygame.font.SysFont(all_ui_fonts, int(24 * self.scale_factor))
+        self.button_font = pygame.font.SysFont(all_ui_fonts, int(22 * self.scale_factor))
+        self.keybind_font = pygame.font.SysFont(all_ui_fonts, int(14 * self.scale_factor))
+        self.guide_font = pygame.font.SysFont(all_ui_fonts, int(20 * self.scale_factor))
         
-        # Load all fonts using the same font file for consistency
-        if font_file:
-            self.char_font = pygame.font.Font(font_file, int(250 * self.scale_factor))
-            self.title_char_font = pygame.font.Font(font_file, int(32 * self.scale_factor))
-            self.ui_font = pygame.font.Font(font_file, int(32 * self.scale_factor))
-            self.small_font = pygame.font.Font(font_file, int(24 * self.scale_factor))
-            self.button_font = pygame.font.Font(font_file, int(22 * self.scale_factor))
-            self.keybind_font = pygame.font.Font(font_file, int(14 * self.scale_factor))
-            self.guide_font = pygame.font.Font(font_file, int(20 * self.scale_factor))
-        else:
-            # Fallback to SysFont if direct file loading failed
-            self.char_font = pygame.font.SysFont(japanese_fonts, int(250 * self.scale_factor))
-            self.title_char_font = pygame.font.SysFont(japanese_fonts, int(32 * self.scale_factor))
-            self.ui_font = pygame.font.SysFont(ui_fonts, int(32 * self.scale_factor))
-            self.small_font = pygame.font.SysFont(ui_fonts, int(24 * self.scale_factor))
-            self.button_font = pygame.font.SysFont(ui_fonts, int(22 * self.scale_factor))
-            self.keybind_font = pygame.font.SysFont(ui_fonts, int(14 * self.scale_factor))
-            self.guide_font = pygame.font.SysFont(ui_fonts, int(20 * self.scale_factor))
-            print(f"✓ Loaded Japanese fonts using SysFont")
+        print(f"✓ Loaded all fonts using SysFont with scale factor: {self.scale_factor}")
         
         # Test if Japanese characters actually render
         test_char = self.char_font.render('あ', True, (0, 0, 0))
