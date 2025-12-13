@@ -207,8 +207,12 @@ class HiraganaPracticeApp:
         self.keybind_font = pygame.font.SysFont(japanese_fonts, int(14 * self.scale_factor))
         self.guide_font = pygame.font.SysFont(japanese_fonts, int(20 * self.scale_factor))
         
-        # Create separate emoji font for emoji-only rendering
-        self.emoji_font = pygame.font.SysFont(emoji_fonts, int(24 * self.scale_factor))
+        # Create emoji fonts matching each text font size for proper scaling
+        self.emoji_ui_font = pygame.font.SysFont(emoji_fonts, int(32 * self.scale_factor))
+        self.emoji_small_font = pygame.font.SysFont(emoji_fonts, int(24 * self.scale_factor))
+        self.emoji_button_font = pygame.font.SysFont(emoji_fonts, int(22 * self.scale_factor))
+        self.emoji_keybind_font = pygame.font.SysFont(emoji_fonts, int(14 * self.scale_factor))
+        self.emoji_guide_font = pygame.font.SysFont(emoji_fonts, int(20 * self.scale_factor))
         
         print(f"✓ Loaded all fonts using SysFont with scale factor: {self.scale_factor}")
         
@@ -223,7 +227,7 @@ class HiraganaPracticeApp:
             print("\n🔧 FIX: Install Japanese fonts for your system")
         
         # Check if emoji support is available using the dedicated emoji font
-        test_emoji = self.emoji_font.render("📚", True, (0, 0, 0))
+        test_emoji = self.emoji_small_font.render("📚", True, (0, 0, 0))
         has_emoji = test_emoji.get_width() > 10  # If width is small, emoji not supported
         
         if not has_emoji:
@@ -247,8 +251,21 @@ class HiraganaPracticeApp:
     def render_text_with_emoji(self, emoji, fallback_text, text, font, color):
         """Render emoji and text as separate surfaces if emoji is supported, then combine."""
         if self.has_emoji_support:
-            # Render emoji with emoji font and text with regular font
-            emoji_surface = self.emoji_font.render(emoji + " ", True, color)
+            # Select emoji font matching the text font size
+            emoji_font = self.emoji_small_font  # Default
+            if font == self.ui_font:
+                emoji_font = self.emoji_ui_font
+            elif font == self.small_font:
+                emoji_font = self.emoji_small_font
+            elif font == self.button_font:
+                emoji_font = self.emoji_button_font
+            elif font == self.keybind_font:
+                emoji_font = self.emoji_keybind_font
+            elif font == self.guide_font:
+                emoji_font = self.emoji_guide_font
+            
+            # Render emoji with matching-sized emoji font and text with regular font
+            emoji_surface = emoji_font.render(emoji + " ", True, color)
             text_surface = font.render(text, True, color)
             
             # Create combined surface
@@ -335,8 +352,11 @@ class HiraganaPracticeApp:
         def render_label_with_emoji(emoji, fallback_text, label_text, font):
             """Render emoji and text as separate surfaces if emoji is supported."""
             if self.has_emoji_support:
-                # Render emoji with emoji font and text with regular font
-                emoji_surface = self.emoji_font.render(emoji + " ", True, DARK_GRAY)
+                # Select emoji font matching the text font size
+                emoji_font = self.emoji_small_font  # Default for info panel
+                
+                # Render emoji with matching-sized emoji font and text with regular font
+                emoji_surface = emoji_font.render(emoji + " ", True, DARK_GRAY)
                 text_surface = font.render(label_text, True, DARK_GRAY)
                 
                 # Create combined surface
